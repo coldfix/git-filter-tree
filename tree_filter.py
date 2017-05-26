@@ -11,6 +11,12 @@ from subprocess import Popen, PIPE
 from itertools import starmap
 
 
+def communicate(args, text=None):
+    text = text.encode('utf-8') if text else None
+    proc = Popen(args, stdin=PIPE, stdout=PIPE)
+    return proc.communicate(text)[0].decode('utf-8')
+
+
 def read_tree(sha1):
     """Iterate over tuples (mode, kind, sha1, name)."""
     cmd = "git ls-tree {}"
@@ -22,14 +28,13 @@ def write_tree(entries):
     """Create a tree and return the hash."""
     #print(list(entries))
     text = '\n'.join(starmap('{} {} {}\t{}'.format, entries))
-    proc = Popen(['git', 'mktree'], stdin=PIPE, stdout=PIPE)
-    return proc.communicate(text.encode('utf-8'))[0].decode('utf-8').strip()
+    args = ['git', 'mktree']
+    return communicate(args, text).strip()
 
 
 def write_blob(text):
     args = ['git', 'hash-object', '-w', '-t', 'blob', '--stdin']
-    proc = Popen(args, stdin=PIPE, stdout=PIPE)
-    return proc.communicate(text.encode('utf-8'))[0].decode('utf-8').strip()
+    return communicate(args, text).strip()
 
 
 def cached(func):
