@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from tree_filter import read_tree, write_tree, cached, rewrite_trees
+from tree_filter import read_tree, write_tree, write_blob, cached, rewrite_trees
 
 
 def rewrite_roottree(sha1):

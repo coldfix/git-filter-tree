@@ -26,6 +26,12 @@ def write_tree(entries):
     return proc.communicate(text.encode('utf-8'))[0].decode('utf-8').strip()
 
 
+def write_blob(text):
+    args = ['git', 'hash-object', '-w', '-t', 'blob', '--stdin']
+    proc = Popen(args, stdin=PIPE, stdout=PIPE)
+    return proc.communicate(text.encode('utf-8'))[0].decode('utf-8').strip()
+
+
 def cached(func):
     cache = multiprocessing.Manager().dict()
     def wrapper(*args):
