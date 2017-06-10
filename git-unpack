@@ -1,0 +1,34 @@
+#! /bin/zsh
+
+set -e
+
+PTH_SCRIPTS=$(dirname $(readlink -f ${(%):-%x}))
+export orig=$(readlink -f $1)
+export dest=$(readlink -f $2)
+
+SECTION() {
+    echo "\n\n$1"
+    echo ${1//?/=}
+}
+
+SECTION "Clone repository"
+git clone $orig $dest --mirror
+cd $dest
+
+
+SECTION "Rewriting trees (parallel)"
+refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
+git log --format='%T' $refs | sort -u | $PTH_SCRIPTS/git-unpack.py
+
+
+SECTION "Rewriting commits (sequential)"
+git filter-branch --commit-filter '
+    git commit-tree $(cat $dest/objmap/$1) "${@:2}"' -- $refs
+
+
+SECTION "Cleaning and compressing objects"
+rm -rf refs/original/
+git reflog expire --expire=now --all
+git gc --prune=now
+git gc --aggressive --prune=now
+cd -

@@ -1,0 +1,90 @@
+#! /bin/zsh
+
+set -e
+
+PTH_SCRIPTS=$(dirname $(readlink -f ${(%):-%x}))
+URL_ORIGINAL=$1
+PTH_SUBFOLDER=$2
+URL_SUBMODULE=$3
+PTH_PARENT=${4:-/tmp/$(basename $1)-parent}
+PTH_SUBMODULE=${5:-/tmp/$(basename $1)-submodule}
+
+
+SECTION() {
+    echo "\n\n$1"
+    echo ${1//?/=}
+}
+
+
+extract_submodule() {
+    local origin=$(readlink -f $1)
+    local submodule=$(readlink -f $2)
+    local subfolder=$3
+
+    git clone $origin $submodule --mirror
+    cd $submodule
+
+    SECTION "$submodule: Extracting folder '$subfolder'"
+    refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
+    echo $(pwd) $refs
+    git filter-branch --prune-empty --subdirectory-filter $subfolder -- $refs
+
+    SECTION "$submodule: Deleting disconnected branches"
+    for ref in $refs; do
+        if ! git merge-base master $ref >/dev/null; then
+            if [[ $ref == refs/tags/* ]]; then
+                git tag -d ${ref#refs/tags/}
+            else
+                git branch -D ${ref#refs/heads/}
+            fi
+        fi
+    done
+
+    SECTION "$submodule: Creating index: TREE -> COMMIT"
+    mkdir treemap
+    newrefs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
+    git log --format="%H %T" $newrefs | while read sha1 tree; do
+        echo $sha1 > treemap/$tree
+    done
+
+    cd -
+}
+
+rewrite_dir2mod() {
+    export origin=$(readlink -f $1)
+    local  submodule=$(readlink -f $2)
+    local  subfolder=$3
+
+    cd $origin
+
+    SECTION "Rewriting trees (parallel)"
+    refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
+    git log --format='%T' $refs | sort -u | $PTH_SCRIPTS/git-dir2mod.py
+
+    SECTION "Rewriting commits (sequential)"
+    git filter-branch --commit-filter '
+        git commit-tree $(cat $origin/objmap/$1) "${@:2}"' -- $refs
+
+    cd -
+}
+
+compress_repo() {
+    SECTION "$1: Cleaning and compressing objects"
+    cd $1
+    rm -rf refs/original/
+    git reflog expire --expire=now --all
+    git gc --prune=now
+    git gc --aggressive --prune=now
+    cd -
+}
+
+
+#----------------------------------------
+# MAIN
+#----------------------------------------
+
+git clone $URL_ORIGINAL $PTH_PARENT --mirror
+extract_submodule $PTH_PARENT $PTH_SUBMODULE $PTH_SUBFOLDER
+rewrite_dir2mod $PTH_PARENT $PTH_SUBMODULE $PTH_SUBFOLDER $URL_SUBMODULE
+compress_repo $PTH_SUBMODULE
+compress_repo $PTH_PARENT
