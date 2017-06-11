@@ -54,12 +54,14 @@ rewrite_dir2mod() {
     export origin=$(readlink -f $1)
     local  submodule=$(readlink -f $2)
     local  subfolder=$3
+    local  url=$4
 
     cd $origin
 
     SECTION "Rewriting trees (parallel)"
     refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
-    git log --format='%T' $refs | sort -u | $PTH_SCRIPTS/git-dir2mod.py
+    git log --format='%T' $refs | sort -u | $PTH_SCRIPTS/git-dir2mod.py \
+        $submodule/treemap $subfolder $url
 
     SECTION "Rewriting commits (sequential)"
     git filter-branch --commit-filter '
