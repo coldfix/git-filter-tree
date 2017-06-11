@@ -23,7 +23,7 @@ that maps top level trees to other the rewritten trees, i.e.
     echo NEW_SHA1 > objmap/OLD_SHA1
 """
 
-from tree_filter import TreeFilter, cache_on, write_blob
+from tree_filter import TreeFilter, cached, write_blob
 
 import os
 import sys
@@ -43,17 +43,17 @@ class Dir2Mod(TreeFilter):
             return self.rewrite_tree(mode, kind, sha1, name)
         return [(mode, kind, sha1, name)]
 
-    @cache_on(3)
+    @cached
     def rewrite_tree(self, mode, kind, sha1, name):
         commit = open(os.path.join(self.treemap, sha1)).read().strip()
         return [
             ('160000', 'commit', commit, name),
-            self.gitmodules_file(None),
+            self.gitmodules_file(),
         ]
 
     # TODO: append to existing
-    @cache_on(1)
-    def gitmodules_file(self, sha1):
+    @cached
+    def gitmodules_file(self):
         sha1 = write_blob("""
 [submodule "{}"]
 	path = {}
