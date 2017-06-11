@@ -34,12 +34,11 @@ class Unpack(TreeFilter):
 
     @cached
     def rewrite_file(self, mode, kind, sha1, name):
-        if not name.endswith(self.ext):
-            return [(mode, kind, sha1, name)]
-        base, ext = os.path.splitext(name)
-        cmd = "git cat-file blob {} | {} | git hash-object -w -t blob --stdin"
-        sha1 = os.popen(cmd.format(sha1, self.unz)).read().strip()
-        return [(mode, kind, sha1, base)]
+        if name.endswith(self.ext):
+            name, ext = os.path.splitext(name)
+            cmd = "git cat-file blob {} | {} | git hash-object -w -t blob --stdin"
+            sha1 = os.popen(cmd.format(sha1, self.unz)).read().strip()
+        return [(mode, kind, sha1, name)]
 
 
 if __name__ == '__main__':
