@@ -52,6 +52,7 @@ def time_to_str(seconds):
 
 class TreeFilter(object):
 
+    @cached
     def get_root(self, sha1):
         sha1 = sha1.strip()
         (new_mode, new_kind, new_sha1, new_name), = \
@@ -73,6 +74,7 @@ class TreeFilter(object):
             sha1 = write_tree(new_entries)
         return [(mode, kind, sha1, name)]
 
+    @cached
     def rewrite_object(self, mode, kind, sha1, name):
         rewrite = self.rewrite_file if kind == 'blob' else self.rewrite_tree
         return rewrite(mode, kind, sha1.strip(), name)
