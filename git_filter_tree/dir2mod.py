@@ -2,24 +2,17 @@
 History rewrite helper script: Convert subfolder to submodule.
 
 Usage:
-    git-filter-tree dir2mod TREEMAP FOLDER URL [NAME]
+    git-filter-tree dir2mod TREEMAP FOLDER URL [NAME] [-- REFS]
 
 Arguments:
 
     TREEMAP     Path to tree index. For every top-level tree there should be
                 a file $TREEMAP/$TREE_SHA1 that contains the SHA1 of the
                 target commit.
-
     FOLDER      Subfolder to replace.
-
     URL         URL of the submodule
-
     NAME        Name of the submodule (defaults to FOLDER)
-
-This will leave you with with an `objmap` folder in the current directory
-that maps top level trees to other the rewritten trees, i.e.
-
-    echo NEW_SHA1 > objmap/OLD_SHA1
+    REFS        `git-rev-list` options
 """
 
 from .tree_filter import TreeFilter, cached, write_blob, read_blob

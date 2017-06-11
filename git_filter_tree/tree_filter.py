@@ -8,7 +8,7 @@ import sys
 import time
 
 from collections import namedtuple
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, call
 from itertools import starmap
 
 
@@ -75,7 +75,16 @@ def time_to_str(seconds):
     return time.strftime('%H:%M:%S', time.gmtime(seconds))
 
 
+def SECTION(title):
+    print("\n\n"+title+"\n"+"="*len(title))
+
+
 class TreeFilter(object):
+
+    def __init__(self):
+        self.gitdir = communicate(['git', 'rev-parse', '--git-dir']).strip()
+        self.gitdir = os.path.abspath(self.gitdir)
+        self.objmap = os.path.join(self.gitdir, 'objmap')
 
     @cached
     def rewrite_root(self, sha1):
@@ -122,14 +131,36 @@ class TreeFilter(object):
     def main(cls, args=None):
         if args is None:
             args = sys.argv[1:]
-        instance = cls(*args)
-        sys.exit(instance.run())
 
-    def run(self, trees=None):
+        if '--' in args:
+            cut = args.index('--')
+            args, refs = args[:cut], args[cut+1:]
+            instance = cls(*args)
+
+            trees = communicate(['git', 'log', '--format=%T', *refs])
+            trees = sorted(set(trees.splitlines()))
+            sys.exit(instance.filter_tree(trees) or
+                     instance.filter_branch(refs))
+
+        else:
+            instance = cls(*args)
+            sys.exit(instance.filter_tree())
+
+
+
+    def filter_tree(self, trees=None):
         if trees is None:
             trees = list(sys.stdin)
 
-        os.makedirs('objmap', exist_ok=True)
+        try:
+            os.makedirs(self.objmap)
+        except FileExistsError:
+            print("objmap already exists:", self.objmap)
+            print("If there is no other rebase in progress, please clean up\n"
+                  "this folder and retry.")
+            return 1
+
+        SECTION("Rewriting trees (parallel)")
 
         pool = multiprocessing.Pool(2*multiprocessing.cpu_count())
 
@@ -159,6 +190,14 @@ class TreeFilter(object):
 
         elapsed = time.time() - tstart
         print('\nTree rewrite completed in {} ({:.1f} trees/sec)'
-              .format(time_to_str(elapsed), done / elapsed), end='')
+              .format(time_to_str(elapsed), done / elapsed))
 
         return 0
+
+    def filter_branch(self, refs):
+        SECTION("Rewriting commits (sequential)")
+        call([
+            'git', 'filter-branch', '--commit-filter',
+            'git commit-tree $(cat $objmap/$1) "${@:2}"',
+            '--', *refs
+        ], env={'objmap': self.objmap})

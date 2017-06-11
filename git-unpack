@@ -2,34 +2,12 @@
 
 set -e
 
-PTH_SCRIPTS=$(dirname $(readlink -f ${(%):-%x}))
-export orig=$(readlink -f $1)
-export dest=$(readlink -f $2)
+local scripts=$(dirname $(readlink -f ${(%):-%x}))
+local orig=$(readlink -f $1)
+local dest=$(readlink -f $2)
 
-SECTION() {
-    echo "\n\n$1"
-    echo ${1//?/=}
-}
+git clone $orig $dest --mirror && cd $dest
 
-SECTION "Clone repository"
-git clone $orig $dest --mirror
-cd $dest
+python $scripts/git_filter_tree unpack -- --branches --tags
 
-
-SECTION "Rewriting trees (parallel)"
-git log --format='%T' --branches --tags | sort -u | \
-    python $PTH_SCRIPTS/git_filter_tree unpack
-
-
-SECTION "Rewriting commits (sequential)"
-git filter-branch --commit-filter \
-    'git commit-tree $(cat $dest/objmap/$1) "${@:2}"' \
-    -- --branches --tags
-
-
-SECTION "Cleaning and compressing objects"
-rm -rf refs/original/
-git reflog expire --expire=now --all
-git gc --prune=now
-git gc --aggressive --prune=now
-cd -
+$scripts/git-compress

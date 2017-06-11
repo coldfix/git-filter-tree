@@ -2,17 +2,13 @@
 History rewrite helper script: Unzip files in history
 
 Usage:
-    git-filter-tree unpack [EXT] [PROG]
+    git-filter-tree unpack [EXT] [PROG] [-- REFS]
 
 Arguments:
 
     EXT         Filename extension          [default: .gz]
     PROG        Program to run for the file [default: gunzip]
-
-This will leave you with with an `objmap` folder in the current directory
-that maps top level trees to other the rewritten trees, i.e.
-
-    echo NEW_SHA1 > objmap/OLD_SHA1
+    REFS        git-rev-list options
 """
 
 from .tree_filter import TreeFilter, cached

@@ -49,33 +49,16 @@ extract_submodule() {
 }
 
 rewrite_dir2mod() {
-    export origin=$(readlink -f $1)
-    local  submodule=$(readlink -f $2)
-    local  subfolder=$3
-    local  url=$4
-
+    local origin=$(readlink -f $1)
+    local submodule=$(readlink -f $2)
+    local subfolder=$3
+    local url=$4
     cd $origin
 
-    SECTION "Rewriting trees (parallel)"
-    git log --format='%T' --branches --tags | sort -u | \
-        python $PTH_SCRIPTS/git_filter_tree dir2mod \
-        $submodule/treemap $subfolder $url
-
-    SECTION "Rewriting commits (sequential)"
-    git filter-branch --commit-filter \
-        'git commit-tree $(cat $origin/objmap/$1) "${@:2}"' \
+    python $PTH_SCRIPTS/git_filter_tree dir2mod \
+        $submodule/treemap $subfolder $url \
         -- --branches --tags
 
-    cd -
-}
-
-compress_repo() {
-    SECTION "$1: Cleaning and compressing objects"
-    cd $1
-    rm -rf refs/original/
-    git reflog expire --expire=now --all
-    git gc --prune=now
-    git gc --aggressive --prune=now
     cd -
 }
 
@@ -87,5 +70,5 @@ compress_repo() {
 git clone $URL_ORIGINAL $PTH_PARENT --mirror
 extract_submodule $PTH_PARENT $PTH_SUBMODULE $PTH_SUBFOLDER
 rewrite_dir2mod $PTH_PARENT $PTH_SUBMODULE $PTH_SUBFOLDER $URL_SUBMODULE
-compress_repo $PTH_SUBMODULE
-compress_repo $PTH_PARENT
+$PTH_SCRIPTS/git-compress $PTH_SUBMODULE
+$PTH_SCRIPTS/git-compress $PTH_PARENT

@@ -1,0 +1,9 @@
+#! /bin/zsh
+SECTION() { echo "\n\n$1\n${1//?/=}" }
+SECTION "Clean and compress objects: ${1:-.}"
+cd ${1:-.}
+GIT_DIR=$(git rev-parse --git-dir)
+rm -rf $GIT_DIR/refs/original/
+git reflog expire --expire=now --all
+git gc --prune=now
+git gc --aggressive --prune=now
