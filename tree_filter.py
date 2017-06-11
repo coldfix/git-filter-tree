@@ -45,10 +45,14 @@ def read_tree(sha1):
 
 def write_tree(entries):
     """Create a tree and return the hash."""
-    #print(list(entries))
     text = '\n'.join(starmap('{} {} {}\t{}'.format, entries))
     args = ['git', 'mktree']
     return communicate(args, text).strip()
+
+
+def read_blob(sha1):
+    args = ['git', 'cat-file', 'blob', sha1.strip()]
+    return communicate(args, None)
 
 
 def write_blob(text):
@@ -74,28 +78,29 @@ def time_to_str(seconds):
 class TreeFilter(object):
 
     @cached
-    def get_root(self, sha1):
+    def rewrite_root(self, sha1):
         sha1 = sha1.strip()
         root = Object('040000', 'tree', sha1, '')
         (new_mode, new_kind, new_sha1, new_name), = \
-            self.rewrite_root(root)
+            self.rewrite_object(root)
         with open('objmap/'+sha1, 'w') as f:
             f.write(new_sha1)
         return new_sha1
 
     @cached
-    def rewrite_root(self, obj):
+    def rewrite_tree(self, obj):
         """Rewrite all folder items individually, recursive."""
-        mode, kind, sha1, name = obj
-        old_entries = list(read_tree(sha1))
-        new_entries = [
-            new_entry
-            for old_entry in old_entries
-            for new_entry in self.rewrite_object(obj.child(*old_entries))
-        ]
+        old_entries = list(read_tree(obj.sha1))
+        new_entries = list(self.map_tree(obj, old_entries))
         if new_entries != old_entries:
             sha1 = write_tree(new_entries)
-        return [(mode, kind, sha1, name)]
+        else:
+            sha1 = obj.sha1
+        return [(obj.mode, obj.kind, sha1, obj.name)]
+
+    def map_tree(self, obj, entries):
+        return [entry for m, k, s, n in entries
+                for entry in self.rewrite_object(obj.child(m, k, s, n)) ]
 
     @cached
     def rewrite_object(self, obj):
@@ -105,8 +110,6 @@ class TreeFilter(object):
     @cached
     def rewrite_file(self, obj):
         return [obj[:]]
-
-    rewrite_tree = rewrite_root
 
     def depends(self, obj):
         # In general, we have to depend on all metadata + location
@@ -129,7 +132,7 @@ class TreeFilter(object):
         checkpoint_done = 0
         checkpoint_time = tstart
 
-        for _ in pool.imap_unordered(self.get_root, trees):
+        for _ in pool.imap_unordered(self.rewrite_root, trees):
         #for _ in map(rewrite_roottree, trees):
             done += 1
             now = time.time()
