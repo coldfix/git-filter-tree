@@ -38,13 +38,15 @@ class Dir2Mod(TreeFilter):
         self.name = name or folder
 
     # TODO: nested path
-    def rewrite_object(self, mode, kind, sha1, name):
+    def rewrite_object(self, obj):
+        mode, kind, sha1, name = obj
         if kind == 'tree' and name == self.folder:
             return self.rewrite_tree(mode, kind, sha1, name)
         return [(mode, kind, sha1, name)]
 
     @cached
-    def rewrite_tree(self, mode, kind, sha1, name):
+    def rewrite_tree(self, obj):
+        mode, kind, sha1, name = obj
         commit = open(os.path.join(self.treemap, sha1)).read().strip()
         return [
             ('160000', 'commit', commit, name),

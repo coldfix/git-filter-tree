@@ -32,8 +32,13 @@ class Unpack(TreeFilter):
         self.ext = ext
         self.unz = unz
 
+    # rewrite depends only on the object payload:
+    def depends(self, obj):
+        return obj.sha1
+
     @cached
-    def rewrite_file(self, mode, kind, sha1, name):
+    def rewrite_file(self, obj):
+        mode, kind, sha1, name = obj
         if name.endswith(self.ext):
             name, ext = os.path.splitext(name)
             cmd = "git cat-file blob {} | {} | git hash-object -w -t blob --stdin"
