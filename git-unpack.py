@@ -20,7 +20,7 @@ that maps top level trees to other the rewritten trees, i.e.
     echo NEW_SHA1 > objmap/OLD_SHA1
 """
 
-from tree_filter import TreeFilter, cached
+from tree_filter import TreeFilter, cache_on
 
 import os
 import sys
@@ -32,7 +32,7 @@ class Unpack(TreeFilter):
         self.ext = ext
         self.unz = unz
 
-    @cached
+    @cache_on(3)
     def rewrite_file(self, mode, kind, sha1, name):
         if name.endswith(self.ext):
             name, ext = os.path.splitext(name)

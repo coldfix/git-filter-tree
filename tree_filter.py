@@ -37,13 +37,15 @@ def write_blob(text):
     return communicate(args, text).strip()
 
 
-def cached(func):
-    cache = multiprocessing.Manager().dict()
-    def wrapper(self, *args):
-        if args not in cache:
-            cache[args] = func(self, *args)
-        return cache[args]
-    return wrapper
+def cache_on(index):
+    def decorator(func):
+        cache = multiprocessing.Manager().dict()
+        def wrapper(*args):
+            if args[index] not in cache:
+                cache[args[index]] = func(*args)
+            return cache[args[index]]
+        return wrapper
+    return decorator
 
 
 def time_to_str(seconds):
@@ -60,7 +62,7 @@ class TreeFilter(object):
             f.write(new_sha1)
         return new_sha1
 
-    @cached
+    @cache_on(3)
     def rewrite_root(self, mode, kind, sha1, name):
         """Rewrite all folder items individually, recursive."""
         old_entries = list(read_tree(sha1))
@@ -77,7 +79,7 @@ class TreeFilter(object):
         rewrite = self.rewrite_file if kind == 'blob' else self.rewrite_tree
         return rewrite(mode, kind, sha1.strip(), name)
 
-    @cached
+    @cache_on(3)
     def rewrite_file(self, mode, kind, sha1, name):
         return [(mode, kind, sha1, name)]
 
