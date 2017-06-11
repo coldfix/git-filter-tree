@@ -17,14 +17,14 @@ cd $dest
 
 
 SECTION "Rewriting trees (parallel)"
-refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
-git log --format='%T' $refs | sort -u | \
+git log --format='%T' --branches --tags | sort -u | \
     python $PTH_SCRIPTS/git_filter_tree unpack
 
 
 SECTION "Rewriting commits (sequential)"
-git filter-branch --commit-filter '
-    git commit-tree $(cat $dest/objmap/$1) "${@:2}"' -- $refs
+git filter-branch --commit-filter \
+    'git commit-tree $(cat $dest/objmap/$1) "${@:2}"' \
+    -- --branches --tags
 
 
 SECTION "Cleaning and compressing objects"

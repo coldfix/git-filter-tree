@@ -25,16 +25,15 @@ extract_submodule() {
     cd $submodule
 
     SECTION "$submodule: Extracting folder '$subfolder'"
-    refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
-    echo $(pwd) $refs
-    git filter-branch --prune-empty --subdirectory-filter $subfolder -- $refs
+    git filter-branch --prune-empty --subdirectory-filter $subfolder \
+        -- --branches --tags
 
     SECTION "$submodule: Deleting disconnected branches"
-    for ref in $refs; do
+    git show-ref | while read sha ref; do
         if ! git merge-base master $ref >/dev/null; then
             if [[ $ref == refs/tags/* ]]; then
                 git tag -d ${ref#refs/tags/}
-            else
+            elif [[ $ref == refs/heads/* ]]; then
                 git branch -D ${ref#refs/heads/}
             fi
         fi
@@ -42,8 +41,7 @@ extract_submodule() {
 
     SECTION "$submodule: Creating index: TREE -> COMMIT"
     mkdir treemap
-    newrefs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
-    git log --format="%H %T" $newrefs | while read sha1 tree; do
+    git log --format="%H %T" --branches --tags | while read sha1 tree; do
         echo $sha1 > treemap/$tree
     done
 
@@ -59,14 +57,14 @@ rewrite_dir2mod() {
     cd $origin
 
     SECTION "Rewriting trees (parallel)"
-    refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
-    git log --format='%T' $refs | sort -u | \
+    git log --format='%T' --branches --tags | sort -u | \
         python $PTH_SCRIPTS/git_filter_tree dir2mod \
         $submodule/treemap $subfolder $url
 
     SECTION "Rewriting commits (sequential)"
-    git filter-branch --commit-filter '
-        git commit-tree $(cat $origin/objmap/$1) "${@:2}"' -- $refs
+    git filter-branch --commit-filter \
+        'git commit-tree $(cat $origin/objmap/$1) "${@:2}"' \
+        -- --branches --tags
 
     cd -
 }
