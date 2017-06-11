@@ -1,9 +1,8 @@
-#!/usr/bin/env python
 """
 History rewrite helper script: Convert subfolder to submodule.
 
 Usage:
-    ./git-dir2mod.py TREEMAP FOLDER URL [NAME]
+    python -m git_filter_tree.dir2mod TREEMAP FOLDER URL [NAME]
 
 Arguments:
 
@@ -23,7 +22,7 @@ that maps top level trees to other the rewritten trees, i.e.
     echo NEW_SHA1 > objmap/OLD_SHA1
 """
 
-from tree_filter import TreeFilter, cached, write_blob, read_blob
+from .tree_filter import TreeFilter, cached, write_blob, read_blob
 
 import multiprocessing
 import os

@@ -60,7 +60,8 @@ rewrite_dir2mod() {
 
     SECTION "Rewriting trees (parallel)"
     refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
-    git log --format='%T' $refs | sort -u | $PTH_SCRIPTS/git-dir2mod.py \
+    git log --format='%T' $refs | sort -u | \
+        PYTHONPATH=$PTH_SCRIPTS python -m git_filter_tree.dir2mod \
         $submodule/treemap $subfolder $url
 
     SECTION "Rewriting commits (sequential)"

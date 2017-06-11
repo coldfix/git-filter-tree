@@ -1,9 +1,8 @@
-#!/usr/bin/env python
 """
 History rewrite helper script: Unzip files in history
 
 Usage:
-    ./git-unpack.py [EXT] [PROG]
+    python -m git_filter_tree.unpack [EXT] [PROG]
 
 Arguments:
 
@@ -20,7 +19,7 @@ that maps top level trees to other the rewritten trees, i.e.
     echo NEW_SHA1 > objmap/OLD_SHA1
 """
 
-from tree_filter import TreeFilter, cached
+from .tree_filter import TreeFilter, cached
 
 import os
 import sys
