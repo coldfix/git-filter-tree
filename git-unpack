@@ -19,7 +19,7 @@ cd $dest
 SECTION "Rewriting trees (parallel)"
 refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
 git log --format='%T' $refs | sort -u | \
-        PYTHONPATH=$PTH_SCRIPTS python -m git_filter_tree.unpack
+    python $PTH_SCRIPTS/git_filter_tree unpack
 
 
 SECTION "Rewriting commits (sequential)"

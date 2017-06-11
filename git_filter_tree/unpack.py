@@ -2,16 +2,12 @@
 History rewrite helper script: Unzip files in history
 
 Usage:
-    python -m git_filter_tree.unpack [EXT] [PROG]
+    git-filter-tree unpack [EXT] [PROG]
 
 Arguments:
 
     EXT         Filename extension          [default: .gz]
     PROG        Program to run for the file [default: gunzip]
-
-Example:
-
-    ./git-unpack.py .gz gunzip
 
 This will leave you with with an `objmap` folder in the current directory
 that maps top level trees to other the rewritten trees, i.e.
@@ -22,12 +18,12 @@ that maps top level trees to other the rewritten trees, i.e.
 from .tree_filter import TreeFilter, cached
 
 import os
-import sys
 
 
 class Unpack(TreeFilter):
 
     def __init__(self, ext='.gz', unz='gunzip'):
+        super().__init__()
         self.ext = ext
         self.unz = unz
 
@@ -45,5 +41,6 @@ class Unpack(TreeFilter):
         return [(mode, kind, sha1, name)]
 
 
+main = Unpack.main
 if __name__ == '__main__':
-    Unpack(*sys.argv[1:]).main()
+    main()

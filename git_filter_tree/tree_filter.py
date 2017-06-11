@@ -118,7 +118,14 @@ class TreeFilter(object):
     def _hash(self, obj=None):
         return hash(self.depends(obj) if isinstance(obj, Object) else obj)
 
-    def main(self, trees=None):
+    @classmethod
+    def main(cls, args=None):
+        if args is None:
+            args = sys.argv[1:]
+        instance = cls(*args)
+        sys.exit(instance.run())
+
+    def run(self, trees=None):
         if trees is None:
             trees = list(sys.stdin)
 
@@ -140,7 +147,7 @@ class TreeFilter(object):
             compl_rate = (now - checkpoint_time) / done_since_checkpoint
             eta = time_to_str((pending - done) * compl_rate)
             print('\r{} / {} Trees rewritten ({:.1f} trees/sec), ETA: {}          '
-                    .format(done, pending, 1 / compl_rate, eta), end='')
+                  .format(done, pending, 1 / compl_rate, eta), end='')
             sys.stdout.flush()
             # Keep a window of the last 5s of rewrites for ETA calculation.
             if now - checkpoint_time > 5:
@@ -153,3 +160,5 @@ class TreeFilter(object):
         elapsed = time.time() - tstart
         print('\nTree rewrite completed in {} ({:.1f} trees/sec)'
               .format(time_to_str(elapsed), done / elapsed), end='')
+
+        return 0

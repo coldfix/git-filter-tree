@@ -2,7 +2,7 @@
 History rewrite helper script: Convert subfolder to submodule.
 
 Usage:
-    python -m git_filter_tree.dir2mod TREEMAP FOLDER URL [NAME]
+    git-filter-tree dir2mod TREEMAP FOLDER URL [NAME]
 
 Arguments:
 
@@ -26,12 +26,12 @@ from .tree_filter import TreeFilter, cached, write_blob, read_blob
 
 import multiprocessing
 import os
-import sys
 
 
 class Dir2Mod(TreeFilter):
 
     def __init__(self, treemap, folder, url, name=None):
+        super().__init__()
         self.treemap = treemap
         self.folder = tuple(folder.split('/'))
         self.url = url
@@ -83,5 +83,6 @@ class Dir2Mod(TreeFilter):
         return ('100644', 'blob', sha1, '.gitmodules')
 
 
+main = Dir2Mod.main
 if __name__ == '__main__':
-    Dir2Mod(*sys.argv[1:]).main()
+    main()

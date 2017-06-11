@@ -13,6 +13,11 @@ setup(
     url='https://github.com/coldfix/git-filter-tree',
     license='GPLv3',
     packages=['git_filter_tree'],
+    entry_points = {
+        'console_scripts': [
+            'git-filter-tree = git_filter_tree.__main__:main',
+        ],
+    },
     install_requires=[],
     classifiers= [
         'Development Status :: 3 - Alpha',
