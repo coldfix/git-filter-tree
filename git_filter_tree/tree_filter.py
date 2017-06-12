@@ -92,7 +92,7 @@ class TreeFilter(object):
         root = Object('040000', 'tree', sha1, '')
         (new_mode, new_kind, new_sha1, new_name), = \
             self.rewrite_object(root)
-        with open('objmap/'+sha1, 'w') as f:
+        with open(os.path.join(self.objmap, sha1), 'w') as f:
             f.write(new_sha1)
         return new_sha1
 
