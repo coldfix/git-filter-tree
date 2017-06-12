@@ -8,6 +8,25 @@ local dest=$(readlink -f $2)
 
 git clone $orig $dest --mirror && cd $dest
 
-python $scripts/git_filter_tree unpack -- --branches --tags
+if [[ -n $SLOW_REWRITE ]]; then
+    git filter-branch --index-filter '
+        mkdir -p .known-objects
+        git ls-tree -lr $GIT_COMMIT | while read -r MODE TYPE OBJ SIZE NAME; do
+            if [[ "$NAME" == tests/**.ref.gz ]]; then
+                if [[ ! -e .known-objects/$OBJ ]]; then
+                    git cat-file blob $OBJ |
+                        gunzip |
+                        git hash-object -w -t blob --stdin > .known-objects/$OBJ
+                fi
+                OBJ=$(< .known-objects/$OBJ)
+                git update-index --remove "$NAME"
+                git update-index --add --cacheinfo $MODE,$OBJ,"${NAME%.gz}"
+            fi
+        done
+    ' -- --branches --tags
+
+else
+    python $scripts/git_filter_tree unpack -- --branches --tags
+fi
 
 $scripts/git-compress
