@@ -43,26 +43,27 @@ class Dir2Mod(TreeFilter):
             return [('160000', 'commit', commit, obj.name)]
         # only recurse into `self.folder`:
         elif obj.path == self.folder[:len(obj.path)]:
-            ret = super().rewrite_tree(obj)
-            if self.has_folder.get(self._hash(obj)):
-                self.has_folder[self._hash(obj.parent)] = True
-            return ret
+            return super().rewrite_tree(obj)
         else:
             return [obj[:]]
 
     @cached
     def rewrite_file(self, obj):
         if obj.name == '.gitmodules' and obj.parent.parent is None:
-            self.has_gitmod[self._hash(obj.parent)] = True
-            return [self.gitmodules_file(obj.sha1)]
+            self.has_gitmod[self._hash(obj.parent)] = obj.sha1
+            return []
         return super().rewrite_file(obj)
 
     def map_tree(self, obj, entries):
         new_entries = super().map_tree(obj, entries)
-        if (obj.parent is None
-                and     self.has_folder.get(self._hash(obj))
-                and not self.has_gitmod.get(self._hash(obj))):
-            new_entries.append(self.gitmodules_file(None))
+        if obj.parent is None and (
+                self.has_folder.get(self._hash(obj)) or
+                self.has_gitmod.get(self._hash(obj))):
+            new_entries.append(self.gitmodules_file(
+                self.has_gitmod.get(self._hash(obj))))
+        elif self.has_folder.get(self._hash(obj)):
+            self.has_folder[self._hash(obj.parent)] = True
+
         return new_entries
 
     @cached
