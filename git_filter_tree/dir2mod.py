@@ -70,8 +70,8 @@ class Dir2Mod(TreeFilter):
         text = sha1 and read_blob(sha1) or ""
         sha1 = write_blob(text + """
 [submodule "{}"]
-	path = {}
-	url = {}
+    path = {}
+    url = {}
 """[1:].format(self.name, '/'.join(self.folder), self.url))
         return ('100644', 'blob', sha1, '.gitmodules')
 

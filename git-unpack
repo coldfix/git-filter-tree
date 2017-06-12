@@ -12,7 +12,7 @@ if [[ -n $SLOW_REWRITE ]]; then
     git filter-branch --index-filter '
         mkdir -p .known-objects
         git ls-tree -lr $GIT_COMMIT | while read -r MODE TYPE OBJ SIZE NAME; do
-            if [[ "$NAME" == tests/**.ref.gz ]]; then
+            if [[ "$NAME" == *.gz ]]; then
                 if [[ ! -e .known-objects/$OBJ ]]; then
                     git cat-file blob $OBJ |
                         gunzip |
