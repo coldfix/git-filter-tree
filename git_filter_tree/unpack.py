@@ -39,4 +39,4 @@ class Unpack(TreeFilter):
 
 main = Unpack.main
 if __name__ == '__main__':
-    main()
+    import sys; sys.exit(main())

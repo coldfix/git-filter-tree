@@ -139,14 +139,12 @@ class TreeFilter(object):
 
             trees = communicate(['git', 'log', '--format=%T', *refs])
             trees = sorted(set(trees.splitlines()))
-            sys.exit(instance.filter_tree(trees) or
-                     instance.filter_branch(refs))
+            return (instance.filter_tree(trees) or
+                    instance.filter_branch(refs))
 
         else:
             instance = cls(*args)
-            sys.exit(instance.filter_tree())
-
-
+            return instance.filter_tree()
 
     def filter_tree(self, trees=None):
         if trees is None:
