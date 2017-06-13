@@ -114,7 +114,8 @@ class TestTreeFilter(unittest.TestCase):
 
 
     def test_unpack_crossref(self):
-        git_unpack = os.path.join(os.path.dirname(__file__), 'git-unpack')
+        base_folder = os.path.dirname(os.path.abspath(__file__))
+        git_unpack = os.path.join(base_folder, 'git-unpack')
         path_slow = tempfile.mkdtemp(prefix='git-unpack-')
         path_fast = tempfile.mkdtemp(prefix='git-unpack-')
         print("Slow:", path_slow)
@@ -128,7 +129,8 @@ class TestTreeFilter(unittest.TestCase):
         self.check_same(repo_fast, repo_slow)
 
     def test_dir2mod_crossref(self):
-        git_dir2mod = os.path.join(os.path.dirname(__file__), 'git-dir2mod')
+        base_folder = os.path.dirname(os.path.abspath(__file__))
+        git_dir2mod = os.path.join(base_folder, 'git-dir2mod')
         path_slow = tempfile.mkdtemp(prefix='git-dir2mod-')
         path_fast = tempfile.mkdtemp(prefix='git-dir2mod-')
         print("Slow:", path_slow)
