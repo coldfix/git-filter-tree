@@ -30,7 +30,6 @@ class Dir2Mod(TreeFilter):
         self.url = url
         self.name = name or folder
         self.has_folder = multiprocessing.Manager().dict()
-        self.has_gitmod = multiprocessing.Manager().dict()
 
     def depends(self, obj):
         return (obj.sha1, obj.path)
@@ -38,7 +37,7 @@ class Dir2Mod(TreeFilter):
     @cached
     def rewrite_tree(self, obj):
         if obj.path == self.folder:
-            self.has_folder[self._hash(obj.parent)] = True
+            self.has_folder[self._hash(obj)] = True
             commit = open(os.path.join(self.treemap, obj.sha1)).read().strip()
             return [('160000', 'commit', commit, obj.name)]
         # only recurse into `self.folder`:
@@ -47,23 +46,19 @@ class Dir2Mod(TreeFilter):
         else:
             return [obj[:]]
 
-    @cached
-    def rewrite_file(self, obj):
-        if obj.name == '.gitmodules' and obj.parent.parent is None:
-            self.has_gitmod[self._hash(obj.parent)] = obj.sha1
-            return []
-        return super().rewrite_file(obj)
-
     def map_tree(self, obj, entries):
         new_entries = super().map_tree(obj, entries)
-        if obj.parent is None and (
-                self.has_folder.get(self._hash(obj)) or
-                self.has_gitmod.get(self._hash(obj))):
-            new_entries.append(self.gitmodules_file(
-                self.has_gitmod.get(self._hash(obj))))
-        elif self.has_folder.get(self._hash(obj)):
-            self.has_folder[self._hash(obj.parent)] = True
-
+        has_folder = self.has_folder.setdefault(self._hash(obj), any(
+            self.has_folder.get(self._hash(obj.child(*item)))
+            for item in entries
+        ))
+        if obj.parent is None and has_folder:
+            i = next((i for i, e in enumerate(new_entries)
+                      if e[3] == '.gitmodules'), None)
+            if i is None:
+                new_entries.append(self.gitmodules_file(None))
+            else:
+                new_entries[i] = self.gitmodules_file(new_entries[i][2])
         return new_entries
 
     @cached
