@@ -119,8 +119,10 @@ class TestTreeFilter(unittest.TestCase):
         path_fast = tempfile.mkdtemp(prefix='git-unpack-')
         print("Slow:", path_slow)
         print("Fast:", path_fast)
-        subprocess.call([git_unpack, self.path, path_slow], env={'SLOW_REWRITE': '1'})
-        subprocess.call([git_unpack, self.path, path_fast], env={'SLOW_REWRITE': ''})
+        env_slow = dict(os.environ, SLOW_REWRITE='1')
+        env_fast = dict(os.environ, SLOW_REWRITE='')
+        subprocess.check_call([git_unpack, self.path, path_slow], env=env_slow)
+        subprocess.check_call([git_unpack, self.path, path_fast], env=env_fast)
         repo_slow = git.Repository(path_slow)
         repo_fast = git.Repository(path_fast)
         self.check_same(repo_fast, repo_slow)
@@ -132,18 +134,20 @@ class TestTreeFilter(unittest.TestCase):
         print("Slow:", path_slow)
         print("Fast:", path_fast)
         subdir = 'nested/subdir'
-        subprocess.call([
+        env_slow = dict(os.environ, SLOW_REWRITE='1')
+        env_fast = dict(os.environ, SLOW_REWRITE='')
+        subprocess.check_call([
             git_dir2mod, self.path, subdir,
             'https://submodule.com',
             path_slow+'.par',
             path_slow+'.sub',
-        ], env={'SLOW_REWRITE': '1'})
-        subprocess.call([
+        ], env=env_slow)
+        subprocess.check_call([
             git_dir2mod, self.path, subdir,
             'https://submodule.com',
             path_fast+'.par',
             path_fast+'.sub',
-        ], env={'SLOW_REWRITE': ''})
+        ], env=env_fast)
         repo_slow = git.Repository(path_slow+'.par')
         repo_fast = git.Repository(path_fast+'.par')
         self.check_same(repo_fast, repo_slow)
