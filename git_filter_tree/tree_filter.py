@@ -145,7 +145,7 @@ class TreeFilter(object):
             args, refs = args[:cut], args[cut+1:]
             instance = cls(*args)
 
-            trees = communicate(['git', 'log', '--format=%T', *refs])
+            trees = communicate(['git', 'log', '--format=%T'] + refs)
             trees = sorted(set(trees.splitlines()))
             return (instance.filter_tree(trees) or
                     instance.filter_branch(refs))
@@ -205,5 +205,5 @@ class TreeFilter(object):
         call([
             'git', 'filter-branch', '--commit-filter',
             'obj=$1 && shift && git commit-tree $(cat $objmap/$obj) "$@"',
-            '--', *refs
-        ], env={'objmap': self.objmap})
+            '--'] + refs,
+             env={'objmap': self.objmap})
