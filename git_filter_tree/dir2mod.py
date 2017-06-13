@@ -52,7 +52,7 @@ class Dir2Mod(TreeFilter):
             self.has_folder.get(self._hash(obj.child(*item)))
             for item in entries
         ))
-        if obj.parent is None and has_folder:
+        if has_folder and not obj.path:
             i = next((i for i, e in enumerate(new_entries)
                       if e[3] == '.gitmodules'), None)
             if i is None:

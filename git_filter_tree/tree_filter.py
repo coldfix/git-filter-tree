@@ -15,12 +15,10 @@ from itertools import starmap
 class Object(namedtuple('Object', ['mode', 'kind', 'sha1', 'name'])):
 
     path = ()
-    parent = None
 
     def child(self, mode, kind, sha1, name):
         obj = Object(mode, kind, sha1, name)
         obj.path = self.path + (name,)
-        obj.parent = self
         return obj
 
     def __hash__(self):
