@@ -39,34 +39,22 @@ def create_tree(repo, tree):
     return builder.write()
 
 
-def C3_mro(get_bases, *bases):
-    """
-    Calculate the C3 MRO of bases.
-
-    Suppose you intended creating a class K with the given base classes. This
-    function returns the MRO which K would have, *excluding* K itself (since
-    it doesn't yet exist), as if you had actually created the class.
-
-    Another way of looking at this, if you pass a single class K, this will
-    return the linearization of K (the MRO of K, *including* itself).
-
-    http://code.activestate.com/recipes/577748-calculate-the-mro-of-a-class/
-    """
-    seqs = [[C] + C3_mro(get_bases, *get_bases(C)) for C in bases] + [list(bases)]
-    result = []
-    while True:
-      seqs = list(filter(None, seqs))
-      if not seqs:
-          return result
-      try:
-          head = next(seq[0] for seq in seqs
-                      if not any(seq[0] in s[1:] for s in seqs))
-      except StopIteration:
-          raise TypeError("inconsistent hierarchy, no C3 MRO is possible")
-      result.append(head)
-      for seq in seqs:
-          if seq[0] == head:
-              del seq[0]
+def linearize_DAG(get_parents, *heads):
+    """Linearize a DAG."""
+    # Return the post-order of depth-first search.
+    L = []
+    M = []              # temporary marks
+    def visit(n):
+        if n in M: raise ValueError("inconsistent hierarchy, not a DAG")
+        if n in L: return
+        M.append(n)
+        for m in get_parents(n):
+            visit(m)
+        M.remove(n)
+        L.append(n)
+    for n in heads:
+        visit(n)
+    return L
 
 
 class Branch:
@@ -85,10 +73,10 @@ class Branch:
             title, create_tree(self.repo, tree),
             list(self.head+merge)),)
 
-
     def ancestors(self):
-        return C3_mro(lambda c: c.parents,
-                      self.repo.lookup_reference(self.name).peel())
+        return linearize_DAG(
+            lambda c: c.parents,
+            self.repo.lookup_reference(self.name).peel())
 
 
 def title(commit):
@@ -150,8 +138,8 @@ class TestTreeFilter(unittest.TestCase):
         for bra, brb in zip(branches_a, branches_b):
             branch_a = Branch(repo_a, name='refs/heads/'+bra)
             branch_b = Branch(repo_b, name='refs/heads/'+brb)
-            commits_a = [(title(c), c.id, c.tree_id) for c in reversed(branch_a.ancestors())]
-            commits_b = [(title(c), c.id, c.tree_id) for c in reversed(branch_b.ancestors())]
+            commits_a = [(title(c), c.id, c.tree_id) for c in branch_a.ancestors()]
+            commits_b = [(title(c), c.id, c.tree_id) for c in branch_b.ancestors()]
             self.assertEqual(commits_a, commits_b)
 
     def test_unpack_crossref(self):
