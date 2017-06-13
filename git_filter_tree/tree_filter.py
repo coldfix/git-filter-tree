@@ -59,14 +59,8 @@ def write_blob(text):
 
 
 def cached(func):
-    # NOTE: We have to lookup the cache via the instance to make sure that
-    # multiprocessing knows how to share it. Since we don't know in advance
-    # which caches will be needed when, and to avoid race conditions we have
-    # to use `setdefault`. But then, to avoid creating a new `dict()` instance
-    # every time, we create one pre-emptively:
-    deflt_cache = multiprocessing.Manager().dict()
+    cache = multiprocessing.Manager().dict()
     def wrapper(self, *args):
-        cache = self._cache.setdefault(func.__name__, deflt_cache)
         key = self._hash(*args)
         if key not in cache:
             cache[key] = func(self, *args)
@@ -89,7 +83,6 @@ class TreeFilter(object):
         self.gitdir = communicate(['git', 'rev-parse', '--git-dir']).strip()
         self.gitdir = os.path.abspath(self.gitdir)
         self.objmap = os.path.join(self.gitdir, 'objmap')
-        self._cache = multiprocessing.Manager().dict()
 
     @cached
     def rewrite_root(self, sha1):
@@ -103,9 +96,8 @@ class TreeFilter(object):
     @cached
     def rewrite_tree(self, obj):
         """Rewrite all folder items individually, recursive."""
-        get_sha1 = lambda x: x[2]
-        old_entries = sorted(read_tree(obj.sha1),               key=get_sha1)
-        new_entries = sorted(self.map_tree(obj, old_entries),   key=get_sha1)
+        old_entries = list(read_tree(obj.sha1))
+        new_entries = list(self.map_tree(obj, old_entries))
         if new_entries != old_entries:
             sha1 = write_tree(new_entries)
         else:
