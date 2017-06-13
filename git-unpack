@@ -21,7 +21,7 @@ if [[ -n $SLOW_REWRITE ]]; then
                 fi
                 OBJ=$(cat .known-objects/$OBJ)
                 git update-index --remove "$NAME"
-                git update-index --add --cacheinfo $MODE,$OBJ,"${NAME%.gz}"
+                git update-index --add --cacheinfo $MODE $OBJ "${NAME%.gz}"
                 ;;
             esac
         done

@@ -96,8 +96,8 @@ EOF
                 fi
                 obj_submod=$(cat "$submodule"/treemap/$obj_folder)
                 git rm -r --cached -q "$subfolder"
-                git update-index --add --cacheinfo 100644,$obj_gitmod,.gitmodules
-                git update-index --add --cacheinfo 160000,$obj_submod,"$subfolder"
+                git update-index --add --cacheinfo 100644 $obj_gitmod .gitmodules
+                git update-index --add --cacheinfo 160000 $obj_submod "$subfolder"
             fi
         }; f
         ' -- $refs
