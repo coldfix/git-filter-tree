@@ -15,7 +15,8 @@ Arguments:
     REFS        `git-rev-list` options
 """
 
-from .tree_filter import TreeFilter, cached, write_blob, read_blob
+from .tree_filter import (TreeFilter, cached, write_blob, read_blob,
+                          read_tree, write_tree)
 
 import multiprocessing
 import os
@@ -29,7 +30,6 @@ class Dir2Mod(TreeFilter):
         self.folder = tuple(folder.split('/'))
         self.url = url
         self.name = name or folder
-        self.has_folder = multiprocessing.Manager().dict()
 
     def depends(self, obj):
         return (obj.sha1, obj.path)
@@ -37,29 +37,31 @@ class Dir2Mod(TreeFilter):
     @cached
     def rewrite_tree(self, obj):
         if obj.path == self.folder:
-            self.has_folder[self._hash(obj)] = True
             commit = open(os.path.join(self.treemap, obj.sha1)).read().strip()
-            return [('160000', 'commit', commit, obj.name)]
+            return [('160000', 'commit', commit, obj.name, True)]
         # only recurse into `self.folder`:
         elif obj.path == self.folder[:len(obj.path)]:
-            return super().rewrite_tree(obj)
+
+            old_entries = read_tree(obj.sha1)
+            new_entries = self.map_tree(obj, old_entries)
+            has_folder = max(map(len, new_entries)) == 5
+
+            if not has_folder:
+                return [obj[:]]
+
+            if not obj.path:
+                i = next((i for i, e in enumerate(new_entries)
+                          if e[3] == '.gitmodules'), None)
+                if i is None:
+                    new_entries.append(self.gitmodules_file(None))
+                else:
+                    new_entries[i] = self.gitmodules_file(new_entries[i][2])
+
+            sha1 = write_tree(new_entries)
+            return [(obj.mode, obj.kind, sha1, obj.name, True)]
+
         else:
             return [obj[:]]
-
-    def map_tree(self, obj, entries):
-        new_entries = super().map_tree(obj, entries)
-        has_folder = self.has_folder.setdefault(self._hash(obj), any(
-            self.has_folder.get(self._hash(obj.child(*item)))
-            for item in entries
-        ))
-        if has_folder and not obj.path:
-            i = next((i for i, e in enumerate(new_entries)
-                      if e[3] == '.gitmodules'), None)
-            if i is None:
-                new_entries.append(self.gitmodules_file(None))
-            else:
-                new_entries[i] = self.gitmodules_file(new_entries[i][2])
-        return new_entries
 
     @cached
     def gitmodules_file(self, sha1):

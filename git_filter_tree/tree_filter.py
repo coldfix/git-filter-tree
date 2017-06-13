@@ -43,7 +43,7 @@ def read_tree(sha1):
 
 def write_tree(entries):
     """Create a tree and return the hash."""
-    text = '\n'.join(starmap('{} {} {}\t{}'.format, entries))
+    text = '\n'.join(starmap('{0} {1} {2}\t{3}'.format, entries))
     args = ['git', 'mktree']
     return communicate(args, text).strip()
 
@@ -95,11 +95,10 @@ class TreeFilter(object):
     def rewrite_root(self, sha1):
         sha1 = sha1.strip()
         root = Object('040000', 'tree', sha1, '')
-        (new_mode, new_kind, new_sha1, new_name), = \
-            self.rewrite_object(root)
+        tree, = self.rewrite_object(root)
         with open(os.path.join(self.objmap, sha1), 'w') as f:
-            f.write(new_sha1)
-        return new_sha1
+            f.write(tree[2])
+        return tree[2]
 
     @cached
     def rewrite_tree(self, obj):
@@ -115,7 +114,7 @@ class TreeFilter(object):
 
     def map_tree(self, obj, entries):
         return [entry for m, k, s, n in entries
-                for entry in self.rewrite_object(obj.child(m, k, s, n)) ]
+                for entry in self.rewrite_object(obj.child(m, k, s, n))]
 
     @cached
     def rewrite_object(self, obj):
