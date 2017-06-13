@@ -39,6 +39,12 @@ def create_tree(repo, tree):
     return builder.write()
 
 
+def log(path, branch):
+    return subprocess.check_output([
+        'git', '-C', path, 'log', '--reverse', '--format=%T %H %s', branch
+    ]).decode('utf-8').splitlines()
+
+
 class Branch:
 
     author = git.Signature('Lord Buckethead', 'lord@bucket.head')
@@ -92,6 +98,8 @@ def init_test_repo(path, bare=True):
 
 class TestTreeFilter(unittest.TestCase):
 
+    maxDiff = None
+
     def setUp(self):
         self.path = tempfile.mkdtemp()
         self.repo = init_test_repo(self.path)
@@ -105,13 +113,11 @@ class TestTreeFilter(unittest.TestCase):
         branches_b = sorted(list(repo_b.branches.local))
         self.assertEqual(branches_a, branches_b)
 
-        # cross-check commit IDs of all branches:
+        # cross-check all branches for equality:
         for bra, brb in zip(branches_a, branches_b):
-            commit_a = repo_a.lookup_reference('refs/heads/'+bra).peel()
-            commit_b = repo_b.lookup_reference('refs/heads/'+brb).peel()
-            self.assertEqual((bra, commit_a.id),
-                             (brb, commit_b.id))
-
+            commits_a = ["Branch: "+bra] + log(repo_a.path, bra)
+            commits_b = ["Branch: "+brb] + log(repo_b.path, brb)
+            self.assertEqual(commits_a, commits_b)
 
     def test_unpack_crossref(self):
         base_folder = os.path.dirname(os.path.abspath(__file__))
