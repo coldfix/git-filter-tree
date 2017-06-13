@@ -15,12 +15,10 @@ from itertools import starmap
 class Object(namedtuple('Object', ['mode', 'kind', 'sha1', 'name'])):
 
     path = ()
-    parent = None
 
     def child(self, mode, kind, sha1, name):
         obj = Object(mode, kind, sha1, name)
         obj.path = self.path + (name,)
-        obj.parent = self
         return obj
 
     def __hash__(self):
@@ -45,7 +43,7 @@ def read_tree(sha1):
 
 def write_tree(entries):
     """Create a tree and return the hash."""
-    text = '\n'.join(starmap('{} {} {}\t{}'.format, entries))
+    text = '\n'.join(starmap('{0} {1} {2}\t{3}'.format, entries))
     args = ['git', 'mktree']
     return communicate(args, text).strip()
 
@@ -97,11 +95,10 @@ class TreeFilter(object):
     def rewrite_root(self, sha1):
         sha1 = sha1.strip()
         root = Object('040000', 'tree', sha1, '')
-        (new_mode, new_kind, new_sha1, new_name), = \
-            self.rewrite_object(root)
+        tree, = self.rewrite_object(root)
         with open(os.path.join(self.objmap, sha1), 'w') as f:
-            f.write(new_sha1)
-        return new_sha1
+            f.write(tree[2])
+        return tree[2]
 
     @cached
     def rewrite_tree(self, obj):
@@ -117,7 +114,7 @@ class TreeFilter(object):
 
     def map_tree(self, obj, entries):
         return [entry for m, k, s, n in entries
-                for entry in self.rewrite_object(obj.child(m, k, s, n)) ]
+                for entry in self.rewrite_object(obj.child(m, k, s, n))]
 
     @cached
     def rewrite_object(self, obj):
@@ -145,7 +142,7 @@ class TreeFilter(object):
             args, refs = args[:cut], args[cut+1:]
             instance = cls(*args)
 
-            trees = communicate(['git', 'log', '--format=%T', *refs])
+            trees = communicate(['git', 'log', '--format=%T'] + refs)
             trees = sorted(set(trees.splitlines()))
             return (instance.filter_tree(trees) or
                     instance.filter_branch(refs))
@@ -204,6 +201,6 @@ class TreeFilter(object):
         SECTION("Rewriting commits (sequential)")
         call([
             'git', 'filter-branch', '--commit-filter',
-            'git commit-tree $(cat $objmap/$1) "${@:2}"',
-            '--', *refs
-        ], env={'objmap': self.objmap})
+            'obj=$1 && shift && git commit-tree $(cat $objmap/$obj) "$@"',
+            '--'] + refs,
+             env={'objmap': self.objmap})
