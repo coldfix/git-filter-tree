@@ -26,7 +26,7 @@ if [[ -n $SLOW_REWRITE ]]; then
     ' -- --branches --tags
 
 else
-    python $scripts/git_filter_tree unpack -- --branches --tags
+    python3 $scripts/git_filter_tree unpack -- --branches --tags
 fi
 
 $scripts/git-compress

@@ -63,7 +63,7 @@ rewrite_dir2mod_fast() {
     local url=$4
     cd $origin
 
-    python $PTH_SCRIPTS/git_filter_tree dir2mod \
+    python3 $PTH_SCRIPTS/git_filter_tree dir2mod \
         $submodule/treemap $subfolder $url \
         -- --branches --tags
 
