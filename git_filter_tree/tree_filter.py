@@ -204,6 +204,6 @@ class TreeFilter(object):
         SECTION("Rewriting commits (sequential)")
         call([
             'git', 'filter-branch', '--commit-filter',
-            'git commit-tree $(cat $objmap/$1) "${@:2}"',
+            'obj=$1 && shift && git commit-tree $(cat $objmap/$obj) "$@"',
             '--', *refs
         ], env={'objmap': self.objmap})

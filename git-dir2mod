@@ -88,16 +88,16 @@ EOF
     refs=($(git show-ref | cut -d' ' -f2- | grep -e ^refs/heads/ -e ^refs/tags/))
     git filter-branch --index-filter '
         f() {
-            if obj_folder=$(git rev-parse $GIT_COMMIT:$subfolder 2>/dev/null); then
+            if obj_folder=$(git rev-parse $GIT_COMMIT:"$subfolder" 2>/dev/null); then
                 if obj_gitmod_old=$(git rev-parse $GIT_COMMIT:.gitmodules 2>/dev/null); then
-                    local obj_gitmod=$((git cat-file blob $obj_gitmod_old &&
-                                        cat $repository/gitmod) |
-                                       git hash-object -w -t blob --stdin)
+                    local obj_gitmod=$( (git cat-file blob $obj_gitmod_old &&
+                                         cat "$repository"/gitmod) |
+                                        git hash-object -w -t blob --stdin )
                 fi
-                obj_submod=$(<$submodule/treemap/$obj_folder)
-                git rm -r --cached -q $subfolder
+                obj_submod=$(cat "$submodule"/treemap/$obj_folder)
+                git rm -r --cached -q "$subfolder"
                 git update-index --add --cacheinfo 100644,$obj_gitmod,.gitmodules
-                git update-index --add --cacheinfo 160000,$obj_submod,$subfolder
+                git update-index --add --cacheinfo 160000,$obj_submod,"$subfolder"
             fi
         }; f
         ' -- $refs
