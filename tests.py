@@ -39,6 +39,36 @@ def create_tree(repo, tree):
     return builder.write()
 
 
+def C3_mro(get_bases, *bases):
+    """
+    Calculate the C3 MRO of bases.
+
+    Suppose you intended creating a class K with the given base classes. This
+    function returns the MRO which K would have, *excluding* K itself (since
+    it doesn't yet exist), as if you had actually created the class.
+
+    Another way of looking at this, if you pass a single class K, this will
+    return the linearization of K (the MRO of K, *including* itself).
+
+    http://code.activestate.com/recipes/577748-calculate-the-mro-of-a-class/
+    """
+    seqs = [[C] + C3_mro(get_bases, *get_bases(C)) for C in bases] + [list(bases)]
+    result = []
+    while True:
+      seqs = list(filter(None, seqs))
+      if not seqs:
+          return result
+      try:
+          head = next(seq[0] for seq in seqs
+                      if not any(seq[0] in s[1:] for s in seqs))
+      except StopIteration:
+          raise TypeError("inconsistent hierarchy, no C3 MRO is possible")
+      result.append(head)
+      for seq in seqs:
+          if seq[0] == head:
+              del seq[0]
+
+
 class Branch:
 
     author = git.Signature('Lord Buckethead', 'lord@bucket.head')
@@ -54,6 +84,15 @@ class Branch:
             self.name, self.author, self.committer,
             title, create_tree(self.repo, tree),
             list(self.head+merge)),)
+
+
+    def ancestors(self):
+        return C3_mro(lambda c: c.parents,
+                      self.repo.lookup_reference(self.name).peel())
+
+
+def title(commit):
+    return commit.message.split('\n', 1)[0]
 
 
 def init_test_repo(path, bare=True):
@@ -92,6 +131,8 @@ def init_test_repo(path, bare=True):
 
 class TestTreeFilter(unittest.TestCase):
 
+    maxDiff = None
+
     def setUp(self):
         self.path = tempfile.mkdtemp()
         self.repo = init_test_repo(self.path)
@@ -105,13 +146,13 @@ class TestTreeFilter(unittest.TestCase):
         branches_b = sorted(list(repo_b.branches.local))
         self.assertEqual(branches_a, branches_b)
 
-        # cross-check commit IDs of all branches:
+        # cross-check all branches for equality:
         for bra, brb in zip(branches_a, branches_b):
-            commit_a = repo_a.lookup_reference('refs/heads/'+bra).peel()
-            commit_b = repo_b.lookup_reference('refs/heads/'+brb).peel()
-            self.assertEqual((bra, commit_a.id),
-                             (brb, commit_b.id))
-
+            branch_a = Branch(repo_a, name='refs/heads/'+bra)
+            branch_b = Branch(repo_b, name='refs/heads/'+brb)
+            commits_a = [(title(c), c.id, c.tree_id) for c in reversed(branch_a.ancestors())]
+            commits_b = [(title(c), c.id, c.tree_id) for c in reversed(branch_b.ancestors())]
+            self.assertEqual(commits_a, commits_b)
 
     def test_unpack_crossref(self):
         git_unpack = os.path.join(os.path.dirname(__file__), 'git-unpack')
