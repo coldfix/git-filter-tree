@@ -39,22 +39,10 @@ def create_tree(repo, tree):
     return builder.write()
 
 
-def linearize_DAG(get_parents, *heads):
-    """Linearize a DAG."""
-    # Return the post-order of depth-first search.
-    L = []
-    M = []              # temporary marks
-    def visit(n):
-        if n in M: raise ValueError("inconsistent hierarchy, not a DAG")
-        if n in L: return
-        M.append(n)
-        for m in get_parents(n):
-            visit(m)
-        M.remove(n)
-        L.append(n)
-    for n in heads:
-        visit(n)
-    return L
+def log(path, branch):
+    return subprocess.check_output([
+        'git', '-C', path, 'log', '--reverse', '--format=%T %H %s', branch
+    ]).decode('utf-8').splitlines()
 
 
 class Branch:
@@ -72,15 +60,6 @@ class Branch:
             self.name, self.author, self.committer,
             title, create_tree(self.repo, tree),
             list(self.head+merge)),)
-
-    def ancestors(self):
-        return linearize_DAG(
-            lambda c: c.parents,
-            self.repo.lookup_reference(self.name).peel())
-
-
-def title(commit):
-    return commit.message.split('\n', 1)[0]
 
 
 def init_test_repo(path, bare=True):
@@ -136,10 +115,8 @@ class TestTreeFilter(unittest.TestCase):
 
         # cross-check all branches for equality:
         for bra, brb in zip(branches_a, branches_b):
-            branch_a = Branch(repo_a, name='refs/heads/'+bra)
-            branch_b = Branch(repo_b, name='refs/heads/'+brb)
-            commits_a = [(title(c), c.id, c.tree_id) for c in branch_a.ancestors()]
-            commits_b = [(title(c), c.id, c.tree_id) for c in branch_b.ancestors()]
+            commits_a = ["Branch: "+bra] + log(repo_a.path, bra)
+            commits_b = ["Branch: "+brb] + log(repo_b.path, brb)
             self.assertEqual(commits_a, commits_b)
 
     def test_unpack_crossref(self):
