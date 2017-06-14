@@ -9,6 +9,8 @@ Arguments:
     EXT         Filename extension          [default: .gz]
     PROG        Program to run for the file [default: gunzip]
     REFS        git-rev-list options
+
+See also: http://coldfix.de/2017/06/11/git-unpack
 """
 
 from .tree_filter import TreeFilter, cached

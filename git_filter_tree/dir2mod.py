@@ -13,6 +13,8 @@ Arguments:
     URL         URL of the submodule
     NAME        Name of the submodule (defaults to FOLDER)
     REFS        `git-rev-list` options
+
+See also: http://coldfix.de/2017/06/13/git-dir2mod
 """
 
 from .tree_filter import (TreeFilter, cached, write_blob, read_blob,
