@@ -12,6 +12,13 @@ from subprocess import Popen, PIPE, call
 from itertools import starmap
 
 
+DISPATCH = {
+    'blob': 'rewrite_file',
+    'tree': 'rewrite_tree',
+    'commit': 'rewrite_commit',
+}
+
+
 class Object(namedtuple('Object', ['mode', 'kind', 'sha1', 'name'])):
 
     path = ()
@@ -110,11 +117,10 @@ class TreeFilter(object):
 
     @cached
     def rewrite_object(self, obj):
-        rewrite = self.rewrite_file if obj.kind == 'blob' else self.rewrite_tree
+        rewrite = getattr(self, DISPATCH.get(obj.kind, 'rewrite_fallback'))
         return rewrite(obj)
 
-    @cached
-    def rewrite_file(self, obj):
+    def rewrite_fallback(self, obj):
         return [obj[:]]
 
     def depends(self, obj):
