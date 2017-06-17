@@ -45,6 +45,15 @@ output the replacement file content on its STDOUT.
 
 For more details, see `git unpack: efficient tree filter`_.
 
+rm
+~~
+
+Remove a few specific files (not dirs) from repository. Usage:
+
+.. code-block:: bash
+
+    python3 git_tree_filter rm [PATH...] -- --branches --tags
+
 dir2mod
 ~~~~~~~
 
