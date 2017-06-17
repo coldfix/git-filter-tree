@@ -13,7 +13,7 @@ Arguments:
 See also: http://coldfix.de/2017/06/11/git-unpack
 """
 
-from .tree_filter import TreeFilter, cached
+from .tree_filter import TreeFilter, cached, read_blob, write_blob
 
 import os
 
@@ -25,18 +25,30 @@ class Unpack(TreeFilter):
         self.ext = ext
         self.unz = unz
 
-    # rewrite depends only on the object payload:
+    # rewrite depends only on the object payload and name:
     def depends(self, obj):
-        return obj.sha1
+        return (obj.sha1, obj.name)
 
     @cached
     def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
-        if name.endswith(self.ext):
+        if name == '.gitattributes':
+            text = obj.sha1 and read_blob(obj.sha1) or ""
+            sha1 = write_blob("\n".join(
+                fix_gitattr_line(line, self.ext)
+                for line in text.splitlines()))
+        elif name.endswith(self.ext):
             name, ext = os.path.splitext(name)
             cmd = "git cat-file blob {} | {} | git hash-object -w -t blob --stdin"
             sha1 = os.popen(cmd.format(sha1, self.unz)).read().strip()
         return [(mode, kind, sha1, name)]
+
+
+def fix_gitattr_line(line, ext):
+    name, attr = line.split(' ', 1)
+    if name.endswith(ext):
+        return name[:-len(ext)] + ' ' + attr
+    return line
 
 
 main = Unpack.main

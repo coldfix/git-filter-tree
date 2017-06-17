@@ -29,7 +29,8 @@ class Dir2Mod(TreeFilter):
     def __init__(self, treemap, folder, url, name=None):
         super().__init__()
         self.treemap = treemap
-        self.folder = tuple(folder.split('/'))
+        self.path = tuple(folder.split('/'))
+        self.folder = folder
         self.url = url
         self.name = name or folder
 
@@ -37,12 +38,23 @@ class Dir2Mod(TreeFilter):
         return (obj.sha1, obj.path)
 
     @cached
+    def rewrite_file(self, obj):
+        mode, kind, sha1, name = obj
+        if name == '.gitattributes':
+            path = self.folder + '/'
+            text = obj.sha1 and read_blob(obj.sha1) or ""
+            sha1 = write_blob("\n".join(
+                line for line in text.splitlines()
+                if not line.startswith(path)))
+        return [(mode, kind, sha1, name)]
+
+    @cached
     def rewrite_tree(self, obj):
-        if obj.path == self.folder:
+        if obj.path == self.path:
             commit = open(os.path.join(self.treemap, obj.sha1)).read().strip()
             return [('160000', 'commit', commit, obj.name, True)]
-        # only recurse into `self.folder`:
-        elif obj.path == self.folder[:len(obj.path)]:
+        # only recurse into `self.path`:
+        elif obj.path == self.path[:len(obj.path)]:
 
             old_entries = read_tree(obj.sha1)
             new_entries = self.map_tree(obj, old_entries)
@@ -72,7 +84,7 @@ class Dir2Mod(TreeFilter):
 [submodule "{}"]
     path = {}
     url = {}
-"""[1:].format(self.name, '/'.join(self.folder), self.url))
+"""[1:].format(self.name, '/'.join(self.path), self.url))
         return ('100644', 'blob', sha1, '.gitmodules')
 
 

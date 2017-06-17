@@ -9,6 +9,7 @@ local dest=$(readlink -f $2)
 git clone $orig $dest --mirror && cd $dest
 
 if [[ -n $SLOW_REWRITE ]]; then
+    # NOTE: this does not rewrite the .gitattributes file:
     git filter-branch --index-filter '
         mkdir -p .known-objects
         git ls-tree -lr $GIT_COMMIT | while read -r MODE TYPE OBJ SIZE NAME; do

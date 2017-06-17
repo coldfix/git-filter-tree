@@ -25,6 +25,7 @@ extract_submodule() {
     cd $submodule
 
     SECTION "$submodule: Extracting folder '$subfolder'"
+    # NOTE: this does not insert a .gitattributes file in the submodule:
     git filter-branch --prune-empty --subdirectory-filter $subfolder \
         -- --branches --tags
 
@@ -85,6 +86,7 @@ rewrite_dir2mod_slow() {
 EOF
 
     export NULL=$(git hash-object -w -t blob --stdin </dev/null)
+    # NOTE: this does not rewrite the .gitattributes file:
     git filter-branch --index-filter '
         mkdir -p .gitmod
         if obj_folder=$(git rev-parse $GIT_COMMIT:"$subfolder" 2>/dev/null); then
