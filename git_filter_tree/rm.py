@@ -16,7 +16,6 @@ class Rm(TreeFilter):
 
     def __init__(self, *files):
         super().__init__()
-        self.paths = [tuple(f.split('/')) for f in files]
         self.files = set(files)
 
     # rewrite depends only on the object payload and name:
@@ -26,7 +25,7 @@ class Rm(TreeFilter):
     @cached
     def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
-        if obj.path in self.paths:
+        if obj.path in self.files:
             return []
         if name == '.gitattributes':
             text = obj.sha1 and read_blob(obj.sha1) or ""

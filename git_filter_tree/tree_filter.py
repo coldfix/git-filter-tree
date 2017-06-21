@@ -21,11 +21,11 @@ DISPATCH = {
 
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
 
-    path = ()
+    path = ''
 
     def child(self, mode, kind, sha1, name):
         obj = DirEntry(mode, kind, sha1, name)
-        obj.path = self.path + (name,)
+        obj.path = (self.path and self.path + '/') + name
         return obj
 
     def __hash__(self):
