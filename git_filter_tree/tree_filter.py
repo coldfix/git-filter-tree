@@ -19,18 +19,18 @@ DISPATCH = {
 }
 
 
-class Object(namedtuple('Object', ['mode', 'kind', 'sha1', 'name'])):
+class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
 
     path = ()
 
     def child(self, mode, kind, sha1, name):
-        obj = Object(mode, kind, sha1, name)
+        obj = DirEntry(mode, kind, sha1, name)
         obj.path = self.path + (name,)
         return obj
 
     def __hash__(self):
-        # Can't use Object.__hash__ because it seems impossible to override in
-        # multiprocessing scenarios (globals don't get transferred), even
+        # Can't use DirEntry.__hash__ because it seems impossible to override
+        # in multiprocessing scenarios (globals don't get transferred), even
         # subclassing seems to be broken…
         raise NotImplementedError
 
@@ -94,7 +94,7 @@ class TreeFilter(object):
     @cached
     def rewrite_root(self, sha1):
         sha1 = sha1.strip()
-        root = Object('040000', 'tree', sha1, '')
+        root = DirEntry('040000', 'tree', sha1, '')
         tree, = self.rewrite_object(root)
         with open(os.path.join(self.objmap, sha1), 'w') as f:
             f.write(tree[2])
@@ -128,7 +128,7 @@ class TreeFilter(object):
         return (obj[:], obj.path)
 
     def _hash(self, obj=None):
-        return hash(self.depends(obj) if isinstance(obj, Object) else obj)
+        return hash(self.depends(obj) if isinstance(obj, DirEntry) else obj)
 
     @classmethod
     def main(cls, args=None):
