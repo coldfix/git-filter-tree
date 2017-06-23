@@ -120,6 +120,9 @@ class TreeFilter(object):
         rewrite = getattr(self, DISPATCH.get(obj.kind, 'rewrite_fallback'))
         return rewrite(obj)
 
+    def rewrite_commit(self, obj):
+        return [obj[:]]
+
     def rewrite_fallback(self, obj):
         return [obj[:]]
 
