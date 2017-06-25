@@ -175,7 +175,7 @@ class TreeFilter(object):
         checkpoint_time = tstart
 
         for _ in pool.imap_unordered(self.rewrite_root, trees):
-        #for _ in map(rewrite_roottree, trees):
+        #for _ in map(self.rewrite_root, trees):
             done += 1
             now = time.time()
             done_since_checkpoint = done - checkpoint_done
