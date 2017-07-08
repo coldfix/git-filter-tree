@@ -19,6 +19,15 @@ huge performance difference compared with ``--index-filter``.
 See also `Large scale Git history rewrites`_.
 
 
+Dependencies
+~~~~~~~~~~~~
+
+- python 3.5
+- pygit2_ (tested with 0.25 and 0.26).
+
+.. _pygit2: http://www.pygit2.org/
+
+
 Usage
 ~~~~~
 
