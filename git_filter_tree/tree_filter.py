@@ -2,7 +2,7 @@
 Utility module for git tree-rewrites.
 """
 
-import multiprocessing
+import multiprocessing.pool
 import os
 import sys
 import math
@@ -15,12 +15,32 @@ from collections import namedtuple
 from subprocess import Popen, PIPE, call
 from itertools import starmap
 
+import pygit2
+
 
 DISPATCH = {
     'blob': 'rewrite_file',
     'tree': 'rewrite_tree',
     'commit': 'rewrite_commit',
 }
+
+
+class Repository:
+
+    def __init__(self, path):
+        self._repo = pygit2.Repository(path)
+
+    def __getattr__(self, key):
+        return getattr(self._repo, key)
+
+    def __getitem__(self, key):
+        return self._repo[key]
+
+    def __getstate__(self):
+        return self._repo.path
+
+    def __setstate__(self, path):
+        self._repo = pygit2.Repository(path)
 
 
 class AsyncQueue:
@@ -51,9 +71,6 @@ class AsyncQueue:
         return self.done.wait()
 
 
-
-
-
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
 
     path = ''
@@ -76,28 +93,27 @@ def communicate(args, text=None):
     return proc.communicate(text)[0].decode('utf-8')
 
 
-def read_tree(sha1):
+def read_tree(repo, sha1):
     """Iterate over tuples (mode, kind, sha1, name)."""
-    cmd = "git ls-tree {}"
-    return [line.rstrip('\r\n').split(maxsplit=3)
-            for line in os.popen(cmd.format(sha1.strip()))]
+    return [(e.filemode, e.type, e.id.hex, e.name)
+            for e in repo[sha1]]
 
 
-def write_tree(entries):
+def write_tree(repo, entries):
     """Create a tree and return the hash."""
-    text = '\n'.join(starmap('{0} {1} {2}\t{3}'.format, entries))
-    args = ['git', 'mktree']
-    return communicate(args, text).strip()
+    builder = repo.TreeBuilder()
+    for e in entries:
+        mode, kind, sha1, name = e[:4]
+        builder.insert(name, sha1, mode)
+    return builder.write().hex
 
 
-def read_blob(sha1):
-    args = ['git', 'cat-file', 'blob', sha1.strip()]
-    return communicate(args, None)
+def read_blob(repo, sha1):
+    return repo[sha1].data
 
 
-def write_blob(text):
-    args = ['git', 'hash-object', '-w', '-t', 'blob', '--stdin']
-    return communicate(args, text).strip()
+def write_blob(repo, text):
+    return repo.create_blob(text).hex
 
 
 def cached(func):
@@ -122,14 +138,14 @@ def SECTION(title):
 class TreeFilter(object):
 
     def __init__(self):
-        self.gitdir = communicate(['git', 'rev-parse', '--git-dir']).strip()
-        self.gitdir = os.path.abspath(self.gitdir)
+        self.gitdir = pygit2.discover_repository('.')
         self.objmap = os.path.join(self.gitdir, 'objmap')
+        self.repo = Repository(self.gitdir)
 
     @cached
     async def rewrite_root(self, sha1):
         sha1 = sha1.strip()
-        root = DirEntry('040000', 'tree', sha1, '')
+        root = DirEntry(0o040000, 'tree', sha1, '')
         tree, = await self.rewrite_object(root)
         with open(os.path.join(self.objmap, sha1), 'w') as f:
             f.write(tree[2])
@@ -200,7 +216,7 @@ class TreeFilter(object):
                   "this folder and retry.")
             return 1
 
-        SECTION("Rewriting trees (parallel)")
+        SECTION("Rewriting trees")
 
         size = 2*multiprocessing.cpu_count()
         self.pool = ProcessPoolExecutor(size)
@@ -233,7 +249,7 @@ class TreeFilter(object):
         return 0
 
     def filter_branch(self, refs):
-        SECTION("Rewriting commits (sequential)")
+        SECTION("Rewriting commits")
         call([
             'git', 'filter-branch', '--commit-filter',
             'obj=$1 && shift && git commit-tree $(cat $objmap/$obj) "$@"',
@@ -242,17 +258,17 @@ class TreeFilter(object):
 
     def read_tree(self, sha1):
         """Iterate over tuples (mode, kind, sha1, name)."""
-        return self.run_in_executor(read_tree, sha1)
+        return self.run_in_executor(read_tree, self.repo, sha1)
 
     def write_tree(self, entries):
         """Create a tree and return the hash."""
-        return self.run_in_executor(write_tree, entries)
+        return self.run_in_executor(write_tree, self.repo, entries)
 
     def read_blob(self, sha1):
-        return self.run_in_executor(read_blob, sha1)
+        return self.run_in_executor(read_blob, self.repo, sha1)
 
     def write_blob(self, text):
-        return self.run_in_executor(write_blob, text)
+        return self.run_in_executor(write_blob, self.repo, text)
 
     def run_in_executor(self, fn, *args):
         loop = asyncio.get_event_loop()
