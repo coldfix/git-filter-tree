@@ -2,7 +2,7 @@
 Utility module for git tree-rewrites.
 """
 
-import multiprocessing
+import multiprocessing.pool
 import os
 import sys
 import math
@@ -20,6 +20,24 @@ DISPATCH = {
     'tree': 'rewrite_tree',
     'commit': 'rewrite_commit',
 }
+
+
+class Repository:
+
+    def __init__(self, path):
+        self._repo = pygit2.Repository(path)
+
+    def __getattr__(self, key):
+        return getattr(self._repo, key)
+
+    def __getitem__(self, key):
+        return self._repo[key]
+
+    def __getstate__(self):
+        return self._repo.path
+
+    def __setstate__(self, path):
+        self._repo = pygit2.Repository(path)
 
 
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
@@ -91,7 +109,7 @@ class TreeFilter(object):
     def __init__(self):
         self.gitdir = pygit2.discover_repository('.')
         self.objmap = os.path.join(self.gitdir, 'objmap')
-        self.repo = pygit2.Repository(self.gitdir)
+        self.repo = Repository(self.gitdir)
 
     @cached
     def rewrite_root(self, sha1):
@@ -174,8 +192,8 @@ class TreeFilter(object):
         done = 0
         start = time.time()
 
-        #for _ in pool.imap_unordered(self.rewrite_root, trees):
-        for _ in map(self.rewrite_root, trees):
+        for _ in pool.imap_unordered(self.rewrite_root, trees):
+        #for _ in map(self.rewrite_root, trees):
             done += 1
             passed = time.time() - start
             rate = passed / done
