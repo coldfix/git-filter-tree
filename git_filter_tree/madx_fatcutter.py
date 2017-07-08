@@ -4,7 +4,7 @@ Module used for the MAD-X migration from SVN to git.
 Combines `unpack` and `rm` filter with one exception for unpacking.
 """
 
-from git_filter_tree.tree_filter import TreeFilter, cached, read_blob, write_blob
+from git_filter_tree.tree_filter import TreeFilter, cached
 
 import os
 
@@ -39,8 +39,8 @@ class FatCutter(TreeFilter):
             return []
         mode, kind, sha1, name = obj
         if name == '.gitattributes':
-            text = obj.sha1 and read_blob(obj.sha1) or ""
-            sha1 = write_blob("\n".join(
+            text = obj.sha1 and self.read_blob(obj.sha1) or ""
+            sha1 = self.write_blob("\n".join(
                 fix_gitattr_line(line)
                 for line in text.splitlines()
                 for name, attr in [line.split(' ', 1)]

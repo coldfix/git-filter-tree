@@ -17,8 +17,7 @@ Arguments:
 See also: http://coldfix.de/2017/06/13/git-dir2mod
 """
 
-from .tree_filter import (TreeFilter, cached, write_blob, read_blob,
-                          read_tree, write_tree)
+from .tree_filter import TreeFilter, cached
 
 import multiprocessing
 import os
@@ -40,8 +39,8 @@ class Dir2Mod(TreeFilter):
     def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
         if name == '.gitattributes':
-            text = obj.sha1 and read_blob(obj.sha1) or ""
-            sha1 = write_blob("\n".join(
+            text = obj.sha1 and self.read_blob(obj.sha1) or ""
+            sha1 = self.write_blob("\n".join(
                 line for line in text.splitlines()
                 if not line.startswith(self.path + '/')))
         return [(mode, kind, sha1, name)]
@@ -54,7 +53,7 @@ class Dir2Mod(TreeFilter):
         # only recurse into `self.path`:
         elif not obj.path or self.path.startswith(obj.path + '/'):
 
-            old_entries = read_tree(obj.sha1)
+            old_entries = self.read_tree(obj.sha1)
             new_entries = self.map_tree(obj, old_entries)
             has_folder = max(map(len, new_entries)) == 5
 
@@ -69,7 +68,7 @@ class Dir2Mod(TreeFilter):
                 else:
                     new_entries[i] = self.gitmodules_file(new_entries[i][2])
 
-            sha1 = write_tree(new_entries)
+            sha1 = self.write_tree(new_entries)
             return [(obj.mode, obj.kind, sha1, obj.name, True)]
 
         else:
@@ -77,8 +76,8 @@ class Dir2Mod(TreeFilter):
 
     @cached
     def gitmodules_file(self, sha1):
-        text = sha1 and read_blob(sha1) or ""
-        sha1 = write_blob(text + """
+        text = sha1 and self.read_blob(sha1) or ""
+        sha1 = self.write_blob(text + """
 [submodule "{}"]
     path = {}
     url = {}

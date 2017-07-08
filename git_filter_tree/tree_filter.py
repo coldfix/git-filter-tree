@@ -103,10 +103,10 @@ class TreeFilter(object):
     @cached
     def rewrite_tree(self, obj):
         """Rewrite all folder items individually, recursive."""
-        old_entries = list(read_tree(obj.sha1))
+        old_entries = list(self.read_tree(obj.sha1))
         new_entries = list(self.map_tree(obj, old_entries))
         if new_entries != old_entries:
-            sha1 = write_tree(new_entries)
+            sha1 = self.write_tree(new_entries)
         else:
             sha1 = obj.sha1
         return [(obj.mode, obj.kind, sha1, obj.name)]
@@ -205,3 +205,17 @@ class TreeFilter(object):
             'obj=$1 && shift && git commit-tree $(cat $objmap/$obj) "$@"',
             '--'] + refs,
              env={'objmap': self.objmap})
+
+    def read_tree(self, sha1):
+        """Iterate over tuples (mode, kind, sha1, name)."""
+        return read_tree(sha1)
+
+    def write_tree(self, entries):
+        """Create a tree and return the hash."""
+        return write_tree(entries)
+
+    def read_blob(self, sha1):
+        return read_blob(sha1)
+
+    def write_blob(self, text):
+        return write_blob(text)
