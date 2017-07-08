@@ -5,6 +5,7 @@ Utility module for git tree-rewrites.
 import multiprocessing
 import os
 import sys
+import math
 import time
 
 from collections import namedtuple
@@ -77,7 +78,7 @@ def cached(func):
 
 
 def time_to_str(seconds):
-    return time.strftime('%H:%M:%S', time.gmtime(seconds))
+    return time.strftime('%H:%M:%S', time.gmtime(math.ceil(seconds)))
 
 
 def SECTION(title):
