@@ -18,6 +18,11 @@ from .tree_filter import TreeFilter, cached
 import os
 
 
+def extract(sha1):
+    cmd = "git cat-file blob {} | gunzip | git hash-object -w -t blob --stdin"
+    return os.popen(cmd.format(sha1)).read().strip()
+
+
 class Unpack(TreeFilter):
 
     def __init__(self, ext='.gz', unz='gunzip'):
@@ -30,18 +35,17 @@ class Unpack(TreeFilter):
         return (obj.sha1, obj.name)
 
     @cached
-    def rewrite_file(self, obj):
+    async def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
         if name == '.gitattributes':
-            text = obj.sha1 and self.read_blob(obj.sha1) or b""
-            sha1 = self.write_blob("\n".join(
+            text = obj.sha1 and await self.read_blob(obj.sha1) or b""
+            sha1 = await self.write_blob("\n".join(
                 fix_gitattr_line(line, self.ext)
                 for line in text.decode('utf-8').splitlines()
             ).encode('utf-8'))
         elif name.endswith(self.ext):
             name, ext = os.path.splitext(name)
-            cmd = "git cat-file blob {} | {} | git hash-object -w -t blob --stdin"
-            sha1 = os.popen(cmd.format(sha1, self.unz)).read().strip()
+            sha1 = await self.run_in_executor(extract, sha1)
         return [(mode, kind, sha1, name)]
 
 
