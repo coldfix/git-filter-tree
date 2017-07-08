@@ -36,25 +36,25 @@ class Dir2Mod(TreeFilter):
         return (obj.sha1, obj.path)
 
     @cached
-    def rewrite_file(self, obj):
+    async def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
         if name == '.gitattributes':
-            text = obj.sha1 and self.read_blob(obj.sha1) or ""
-            sha1 = self.write_blob("\n".join(
+            text = obj.sha1 and await self.read_blob(obj.sha1) or ""
+            sha1 = await self.write_blob("\n".join(
                 line for line in text.splitlines()
                 if not line.startswith(self.path + '/')))
         return [(mode, kind, sha1, name)]
 
     @cached
-    def rewrite_tree(self, obj):
+    async def rewrite_tree(self, obj):
         if obj.path == self.path:
             commit = open(os.path.join(self.treemap, obj.sha1)).read().strip()
             return [('160000', 'commit', commit, obj.name, True)]
         # only recurse into `self.path`:
         elif not obj.path or self.path.startswith(obj.path + '/'):
 
-            old_entries = self.read_tree(obj.sha1)
-            new_entries = self.map_tree(obj, old_entries)
+            old_entries = await self.read_tree(obj.sha1)
+            new_entries = await self.map_tree(obj, old_entries)
             has_folder = max(map(len, new_entries)) == 5
 
             if not has_folder:
@@ -64,20 +64,20 @@ class Dir2Mod(TreeFilter):
                 i = next((i for i, e in enumerate(new_entries)
                           if e[3] == '.gitmodules'), None)
                 if i is None:
-                    new_entries.append(self.gitmodules_file(None))
+                    new_entries.append(await self.gitmodules_file(None))
                 else:
-                    new_entries[i] = self.gitmodules_file(new_entries[i][2])
+                    new_entries[i] = await self.gitmodules_file(new_entries[i][2])
 
-            sha1 = self.write_tree(new_entries)
+            sha1 = await self.write_tree(new_entries)
             return [(obj.mode, obj.kind, sha1, obj.name, True)]
 
         else:
             return [obj[:]]
 
     @cached
-    def gitmodules_file(self, sha1):
-        text = sha1 and self.read_blob(sha1) or ""
-        sha1 = self.write_blob(text + """
+    async def gitmodules_file(self, sha1):
+        text = sha1 and await self.read_blob(sha1) or ""
+        sha1 = await self.write_blob(text + """
 [submodule "{}"]
     path = {}
     url = {}
