@@ -19,7 +19,6 @@ See also: http://coldfix.de/2017/06/13/git-dir2mod
 
 from .tree_filter import TreeFilter, cached
 
-import multiprocessing
 import os
 
 
@@ -39,17 +38,18 @@ class Dir2Mod(TreeFilter):
     def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
         if name == '.gitattributes':
-            text = obj.sha1 and self.read_blob(obj.sha1) or ""
+            text = obj.sha1 and self.read_blob(obj.sha1) or b""
             sha1 = self.write_blob("\n".join(
-                line for line in text.splitlines()
-                if not line.startswith(self.path + '/')))
+                line for line in text.decode('utf-8').splitlines()
+                if not line.startswith(self.path + '/')
+            ).encode('utf-8'))
         return [(mode, kind, sha1, name)]
 
     @cached
     def rewrite_tree(self, obj):
         if obj.path == self.path:
             commit = open(os.path.join(self.treemap, obj.sha1)).read().strip()
-            return [('160000', 'commit', commit, obj.name, True)]
+            return [(0o160000, 'commit', commit, obj.name, True)]
         # only recurse into `self.path`:
         elif not obj.path or self.path.startswith(obj.path + '/'):
 
@@ -76,13 +76,13 @@ class Dir2Mod(TreeFilter):
 
     @cached
     def gitmodules_file(self, sha1):
-        text = sha1 and self.read_blob(sha1) or ""
-        sha1 = self.write_blob(text + """
+        text = sha1 and self.read_blob(sha1) or b""
+        sha1 = self.write_blob((text.decode('utf-8') + """
 [submodule "{}"]
     path = {}
     url = {}
-"""[1:].format(self.name, self.path, self.url))
-        return ('100644', 'blob', sha1, '.gitmodules')
+"""[1:].format(self.name, self.path, self.url)).encode('utf-8'))
+        return (0o100644, 'blob', sha1, '.gitmodules')
 
 
 main = Dir2Mod.main

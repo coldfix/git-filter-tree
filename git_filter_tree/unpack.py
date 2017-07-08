@@ -33,10 +33,11 @@ class Unpack(TreeFilter):
     def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
         if name == '.gitattributes':
-            text = obj.sha1 and self.read_blob(obj.sha1) or ""
+            text = obj.sha1 and self.read_blob(obj.sha1) or b""
             sha1 = self.write_blob("\n".join(
                 fix_gitattr_line(line, self.ext)
-                for line in text.splitlines()))
+                for line in text.decode('utf-8').splitlines()
+            ).encode('utf-8'))
         elif name.endswith(self.ext):
             name, ext = os.path.splitext(name)
             cmd = "git cat-file blob {} | {} | git hash-object -w -t blob --stdin"
