@@ -22,6 +22,37 @@ DISPATCH = {
 }
 
 
+class AsyncQueue:
+
+    def __init__(self, size, jobs):
+        self.done = asyncio.Event()
+        self.jobs = iter(jobs)
+        self.active = 0
+        for _ in range(size):
+            self._start()
+
+    def _start(self):
+        try:
+            job = next(self.jobs)
+        except StopIteration:
+            return
+        future = asyncio.ensure_future(job)
+        future.add_done_callback(self._finished)
+        self.active += 1
+
+    def _finished(self, future):
+        self.active -= 1
+        self._start()
+        if not self.active:
+            self.done.set()
+
+    def __await__(self):
+        return self.done.wait()
+
+
+
+
+
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
 
     path = ''
@@ -193,10 +224,10 @@ class TreeFilter(object):
                   end='')
             sys.stdout.flush()
 
-        loop.run_until_complete(asyncio.wait([
+        loop.run_until_complete(AsyncQueue(size, (
             rewrite_roottree(tree)
             for tree in trees
-        ]))
+        )))
 
         return 0
 
