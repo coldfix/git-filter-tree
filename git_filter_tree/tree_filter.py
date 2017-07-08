@@ -175,10 +175,13 @@ class TreeFilter(object):
         for _ in pool.imap_unordered(self.rewrite_root, trees):
         #for _ in map(self.rewrite_root, trees):
             done += 1
-            rate = (time.time() - start) / done
-            eta = time_to_str((pending - done) * rate)
-            print('\r{} / {} Trees rewritten ({:.1f} trees/sec), ETA: {}          '
-                  .format(done, pending, 1 / rate, eta), end='')
+            passed = time.time() - start
+            rate = passed / done
+            eta = (pending - done) * rate
+            print('\r\033[K{} / {} Trees rewritten ({:.1f} trees/sec) in {}, ETA: {}'
+                  .format(done, pending, 1 / rate,
+                          time_to_str(passed), time_to_str(eta)),
+                  end='')
             sys.stdout.flush()
 
         pool.close()
