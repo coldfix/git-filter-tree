@@ -31,7 +31,7 @@ addons:
 
 install:
   - "./.travis.sh"
-  - pip install pygit2
+  - pip install pygit2==0.26
 
 script:
   - python tests.py
