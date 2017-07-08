@@ -22,7 +22,7 @@ See also `Large scale Git history rewrites`_.
 Dependencies
 ~~~~~~~~~~~~
 
-- python 3.5
+- python 3.6
 - pygit2_ (tested with 0.25 and 0.26).
 
 .. _pygit2: http://www.pygit2.org/
