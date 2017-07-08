@@ -8,6 +8,9 @@ import sys
 import math
 import time
 
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
+
 from collections import namedtuple
 from subprocess import Popen, PIPE, call
 from itertools import starmap
@@ -18,6 +21,37 @@ DISPATCH = {
     'tree': 'rewrite_tree',
     'commit': 'rewrite_commit',
 }
+
+
+class AsyncQueue:
+
+    def __init__(self, size, jobs):
+        self.done = asyncio.Event()
+        self.jobs = iter(jobs)
+        self.active = 0
+        for _ in range(size):
+            self._start()
+
+    def _start(self):
+        try:
+            job = next(self.jobs)
+        except StopIteration:
+            return
+        future = asyncio.ensure_future(job)
+        future.add_done_callback(self._finished)
+        self.active += 1
+
+    def _finished(self, future):
+        self.active -= 1
+        self._start()
+        if not self.active:
+            self.done.set()
+
+    def __await__(self):
+        return self.done.wait()
+
+
+
 
 
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
@@ -45,8 +79,8 @@ def communicate(args, text=None):
 def read_tree(sha1):
     """Iterate over tuples (mode, kind, sha1, name)."""
     cmd = "git ls-tree {}"
-    return (line.rstrip('\r\n').split(maxsplit=3)
-            for line in os.popen(cmd.format(sha1.strip())))
+    return [line.rstrip('\r\n').split(maxsplit=3)
+            for line in os.popen(cmd.format(sha1.strip()))]
 
 
 def write_tree(entries):
@@ -67,11 +101,11 @@ def write_blob(text):
 
 
 def cached(func):
-    cache = multiprocessing.Manager().dict()
+    cache = dict()
     def wrapper(self, *args):
         key = self._hash(*args)
         if key not in cache:
-            cache[key] = func(self, *args)
+            cache[key] = asyncio.ensure_future(func(self, *args))
         return cache[key]
     wrapper.__name__ = func.__name__
     return wrapper
@@ -93,38 +127,39 @@ class TreeFilter(object):
         self.objmap = os.path.join(self.gitdir, 'objmap')
 
     @cached
-    def rewrite_root(self, sha1):
+    async def rewrite_root(self, sha1):
         sha1 = sha1.strip()
         root = DirEntry('040000', 'tree', sha1, '')
-        tree, = self.rewrite_object(root)
+        tree, = await self.rewrite_object(root)
         with open(os.path.join(self.objmap, sha1), 'w') as f:
             f.write(tree[2])
         return tree[2]
 
     @cached
-    def rewrite_tree(self, obj):
+    async def rewrite_tree(self, obj):
         """Rewrite all folder items individually, recursive."""
-        old_entries = list(self.read_tree(obj.sha1))
-        new_entries = list(self.map_tree(obj, old_entries))
+        old_entries = list(await self.read_tree(obj.sha1))
+        new_entries = list(await self.map_tree(obj, old_entries))
         if new_entries != old_entries:
-            sha1 = self.write_tree(new_entries)
+            sha1 = await self.write_tree(new_entries)
         else:
             sha1 = obj.sha1
         return [(obj.mode, obj.kind, sha1, obj.name)]
 
-    def map_tree(self, obj, entries):
+    async def map_tree(self, obj, entries):
+        # TODO: query multiple entries at once?
         return [entry for m, k, s, n in entries
-                for entry in self.rewrite_object(obj.child(m, k, s, n))]
+                for entry in await self.rewrite_object(obj.child(m, k, s, n))]
 
     @cached
     def rewrite_object(self, obj):
         rewrite = getattr(self, DISPATCH.get(obj.kind, 'rewrite_fallback'))
         return rewrite(obj)
 
-    def rewrite_commit(self, obj):
+    async def rewrite_commit(self, obj):
         return [obj[:]]
 
-    def rewrite_fallback(self, obj):
+    async def rewrite_fallback(self, obj):
         return [obj[:]]
 
     def depends(self, obj):
@@ -167,14 +202,19 @@ class TreeFilter(object):
 
         SECTION("Rewriting trees (parallel)")
 
-        pool = multiprocessing.Pool(2*multiprocessing.cpu_count())
+        size = 2*multiprocessing.cpu_count()
+        self.pool = ProcessPoolExecutor(size)
+
+        loop = asyncio.get_event_loop()
+        loop.set_default_executor(self.pool)
 
         pending = len(trees)
         done = 0
         start = time.time()
 
-        for _ in pool.imap_unordered(self.rewrite_root, trees):
-        #for _ in map(self.rewrite_root, trees):
+        async def rewrite_roottree(tree):
+            await self.rewrite_root(tree)
+            nonlocal done
             done += 1
             passed = time.time() - start
             rate = passed / done
@@ -185,8 +225,10 @@ class TreeFilter(object):
                   end='')
             sys.stdout.flush()
 
-        pool.close()
-        pool.join()
+        loop.run_until_complete(AsyncQueue(size, (
+            rewrite_roottree(tree)
+            for tree in trees
+        )))
 
         return 0
 
@@ -200,14 +242,18 @@ class TreeFilter(object):
 
     def read_tree(self, sha1):
         """Iterate over tuples (mode, kind, sha1, name)."""
-        return read_tree(sha1)
+        return self.run_in_executor(read_tree, sha1)
 
     def write_tree(self, entries):
         """Create a tree and return the hash."""
-        return write_tree(entries)
+        return self.run_in_executor(write_tree, entries)
 
     def read_blob(self, sha1):
-        return read_blob(sha1)
+        return self.run_in_executor(read_blob, sha1)
 
     def write_blob(self, text):
-        return write_blob(text)
+        return self.run_in_executor(write_blob, text)
+
+    def run_in_executor(self, fn, *args):
+        loop = asyncio.get_event_loop()
+        return loop.run_in_executor(None, fn, *args)

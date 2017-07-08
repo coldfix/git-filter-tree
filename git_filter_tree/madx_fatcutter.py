@@ -27,6 +27,11 @@ def shall_extract(name):
             name != 'tests/test-hllhc/last_twiss.20.ref.gz')
 
 
+def extract(sha1):
+    cmd = "git cat-file blob {} | gunzip | git hash-object -w -t blob --stdin"
+    return os.popen(cmd.format(sha1)).read().strip()
+
+
 class FatCutter(TreeFilter):
 
     # rewrite depends only on the object payload and name:
@@ -34,13 +39,13 @@ class FatCutter(TreeFilter):
         return (obj.sha1, obj.path)
 
     @cached
-    def rewrite_file(self, obj):
+    async def rewrite_file(self, obj):
         if obj.path in REMOVE:
             return []
         mode, kind, sha1, name = obj
         if name == '.gitattributes':
-            text = obj.sha1 and self.read_blob(obj.sha1) or ""
-            sha1 = self.write_blob("\n".join(
+            text = obj.sha1 and await self.read_blob(obj.sha1) or ""
+            sha1 = await self.write_blob("\n".join(
                 fix_gitattr_line(line)
                 for line in text.splitlines()
                 for name, attr in [line.split(' ', 1)]
@@ -48,8 +53,8 @@ class FatCutter(TreeFilter):
             ))
         elif shall_extract(obj.path):
             name, ext = os.path.splitext(name)
-            cmd = "git cat-file blob {} | gunzip | git hash-object -w -t blob --stdin"
-            sha1 = os.popen(cmd.format(sha1)).read().strip()
+            sha1 = await self.run_in_executor(extract, sha1)
+
         return [(mode, kind, sha1, name)]
 
 
