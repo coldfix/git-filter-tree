@@ -33,7 +33,7 @@ class Dir2Mod(TreeFilter):
         self.name = name or folder
 
     def depends(self, obj):
-        return (obj.sha1, obj.path)
+        return (obj.sha1, obj.path, obj.mode)
 
     @cached
     def rewrite_file(self, obj):
