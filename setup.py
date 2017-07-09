@@ -28,12 +28,14 @@ setup(
             'git-filter-tree = git_filter_tree.__main__:main',
         ],
     },
-    install_requires=[],
+    install_requires=[
+        'pygit2',
+    ],
     classifiers= [
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'Operating System :: Linux',
-        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
         'Topic :: Software Development :: Version Control :: Git',
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
     ],

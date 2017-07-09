@@ -23,16 +23,17 @@ class Rm(TreeFilter):
         return (obj.sha1, obj.name, obj.mode)
 
     @cached
-    def rewrite_file(self, obj):
+    async def rewrite_file(self, obj):
         mode, kind, sha1, name = obj
         if obj.path in self.files:
             return []
         if name == '.gitattributes':
-            text = obj.sha1 and self.read_blob(obj.sha1) or ""
-            sha1 = self.write_blob("\n".join(
-                line for line in text.splitlines()
+            text = obj.sha1 and await self.read_blob(obj.sha1) or b""
+            sha1 = await self.write_blob("\n".join(
+                line for line in text.decode('utf-8').splitlines()
                 for name, attr in [line.split(' ', 1)]
-                if name not in self.files))
+                if name not in self.files
+            ).encode('utf-8'))
         return [(mode, kind, sha1, name)]
 
 
