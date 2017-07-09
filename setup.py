@@ -15,7 +15,7 @@ def long_description():
 
 setup(
     name='git-filter-tree',
-    version='2.0.0',
+    version='2.1.0',
     description='Efficient tree filtering (examples)',
     long_description=long_description(),
     author='Thomas Gläßle',

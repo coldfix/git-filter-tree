@@ -1,6 +1,15 @@
 CHANGES
 ~~~~~~~
 
+2.1.0
+=====
+Date: 09.07.2017
+
+- perform the commit rewrites in python. This leads to a tremendous
+  performance improvement. In a test repo the cost for the second phase went
+  down from more than 2 minutes to about 2 seconds.
+
+
 2.0.0
 =====
 Date: 09.07.2017
