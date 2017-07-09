@@ -273,10 +273,10 @@ class TreeFilter(object):
         if '--' in args:
             cut = args.index('--')
             args, refs = args[:cut], args[cut+1:]
-            trees = communicate(['git', 'log', '--format=%T'] + refs)
-            trees = sorted(set(trees.splitlines()))
+            objs = communicate(['git', 'rev-list', *refs])
+            objs = sorted(set(objs.splitlines()))
         else:
-            trees = list(sys.stdin)
+            objs = list(sys.stdin)
             refs = []
 
         size = 2*multiprocessing.cpu_count()
@@ -286,15 +286,15 @@ class TreeFilter(object):
 
         instance = cls(*args)
         instance.size = size
-        future = asyncio.ensure_future(instance.filter(trees, refs))
+        future = asyncio.ensure_future(instance.filter(objs, refs))
         loop.run_until_complete(future)
         return future.result()
 
-    async def filter(self, trees, refs):
-        return (await self.filter_tree(trees) or
+    async def filter(self, objs, refs):
+        return (await self.filter_tree(objs) or
                 await self.filter_branch(refs))
 
-    async def filter_tree(self, trees):
+    async def filter_tree(self, objs):
         try:
             os.makedirs(self.objmap)
         except FileExistsError:
@@ -304,18 +304,16 @@ class TreeFilter(object):
             return 1
 
         SECTION("Rewriting trees")
-        await process_objects(self.size, self.rewrite_root, trees)
+        await process_objects(self.size, self.rewrite_root, objs)
 
     async def filter_branch(self, refs):
         # NOTE: Since commit rewriting is fully sequential by nature, we could
         # just as well do this in a normal python function. It's done in a
-        # coroutine here just for consistency (easier migration).
-        # NOTE: We could gain some additional speedup by merging the two
-        # phases (commit/tree rewrites) into one thereby effectively making
-        # use of parallelization for the commit rewrites as well. However, I'd
-        # like to keep it separate at least for one commit to demonstrate the
-        # speedup due to using pygit rather than git-filter-branch. Also, this
-        # is a bit more modular.
+        # coroutine here just for consistency.
+        # NOTE: The two phases (commit/tree rewrites) have been merged into
+        # one thereby effectively making use of parallelization for the commit
+        # rewrites as well. However, I'm keeping the code for the second phase
+        # here, so it can be invoked independently:
         SECTION("Rewriting commits")
         revs = communicate(['git', 'rev-list', '--reverse', *refs])
         revs = revs.splitlines()
