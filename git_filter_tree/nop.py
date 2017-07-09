@@ -7,7 +7,7 @@ from git_filter_tree.tree_filter import TreeFilter
 
 class NOP(TreeFilter):
 
-    def rewrite_file(self, obj):
+    async def rewrite_file(self, obj):
         return [obj[:]]
 
 
