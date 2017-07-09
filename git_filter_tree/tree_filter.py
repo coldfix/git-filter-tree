@@ -180,7 +180,7 @@ class TreeFilter(object):
 
     def depends(self, obj):
         # In general, we have to depend on all metadata + location
-        return (obj[:], obj.path)
+        return (obj[:], obj.path, obj.mode)
 
     def _hash(self, obj=None):
         return hash(self.depends(obj) if isinstance(obj, DirEntry) else obj)

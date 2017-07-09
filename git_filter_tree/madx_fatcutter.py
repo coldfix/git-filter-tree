@@ -36,7 +36,7 @@ class FatCutter(TreeFilter):
 
     # rewrite depends only on the object payload and name:
     def depends(self, obj):
-        return (obj.sha1, obj.path)
+        return (obj.sha1, obj.path, obj.mode)
 
     @cached
     async def rewrite_file(self, obj):

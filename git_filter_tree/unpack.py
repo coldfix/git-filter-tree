@@ -32,7 +32,7 @@ class Unpack(TreeFilter):
 
     # rewrite depends only on the object payload and name:
     def depends(self, obj):
-        return (obj.sha1, obj.name)
+        return (obj.sha1, obj.name, obj.mode)
 
     @cached
     async def rewrite_file(self, obj):
