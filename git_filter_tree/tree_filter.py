@@ -2,7 +2,7 @@
 Utility module for git tree-rewrites.
 """
 
-import multiprocessing.pool
+import multiprocessing
 import os
 import sys
 import math
@@ -12,8 +12,8 @@ import asyncio
 from concurrent.futures import ProcessPoolExecutor
 
 from collections import namedtuple
-from subprocess import Popen, PIPE, call
-from itertools import starmap
+from subprocess import Popen, PIPE
+from itertools import chain
 
 import pygit2
 
@@ -26,6 +26,8 @@ DISPATCH = {
 
 
 class Repository:
+
+    """Pickleable proxy for pygit2.Repository."""
 
     def __init__(self, path):
         self._repo = pygit2.Repository(path)
@@ -43,14 +45,43 @@ class Repository:
         self._repo = pygit2.Repository(path)
 
 
+class Signature:
+
+    """Pickleable proxy for pygit2.Signature."""
+
+    def __init__(self, sig):
+        self._sig = sig
+
+    def __getattr__(self, key):
+        return getattr(self._sig, key)
+
+    def __getstate__(self):
+        sig = self._sig
+        return sig.name, sig.email, sig.time, sig.offset
+
+    def __setstate__(self, args):
+        self._sig = pygit2.Signature(*args)
+
+
 class AsyncQueue:
 
-    def __init__(self, size, jobs):
+    def __init__(self, size, cb=None):
+        self.jobs = ()
+        self.size = size
         self.done = asyncio.Event()
-        self.jobs = iter(jobs)
-        self.active = 0
-        for _ in range(size):
+        self.num_pending = 0
+        self.num_active = 0
+        self.num_total = 0
+        self.num_done = 0
+        self.status_callback = cb or (lambda q: None)
+
+    def enqueue(self, num, jobs):
+        self.num_pending += num
+        self.num_total += num
+        self.jobs = chain.from_iterable((self.jobs, jobs))
+        for _ in range(self.size - self.num_active):
             self._start()
+        return self
 
     def _start(self):
         try:
@@ -59,16 +90,39 @@ class AsyncQueue:
             return
         future = asyncio.ensure_future(job)
         future.add_done_callback(self._finished)
-        self.active += 1
+        self.num_active += 1
+        self.num_pending -= 1
 
     def _finished(self, future):
-        self.active -= 1
+        self.num_active -= 1
+        self.num_done += 1
         self._start()
-        if not self.active:
+        if not self.num_active:
             self.done.set()
+        self.status_callback(self)
 
     def __await__(self):
-        return self.done.wait()
+        # NOTE: can't use `async def __await` nor return `self.done.wait()`
+        # directly for some weird type requirements…
+        yield from self.done.wait()
+
+
+async def process_objects(size, func, objs):
+
+    start = time.time()
+    def status(queue):
+        done, pending = queue.num_done, queue.num_total
+        passed = time.time() - start
+        rate = passed / done
+        eta = (pending - done) * rate
+        print('\r\033[K{} / {} objects rewritten ({:.1f} objs/sec) in {}, ETA: {}'
+                .format(done, pending, 1 / rate,
+                        time_to_str(passed), time_to_str(eta)),
+                end='')
+        sys.stdout.flush()
+
+    queue = AsyncQueue(size, status)
+    await queue.enqueue(len(objs), map(func, objs))
 
 
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
@@ -116,6 +170,11 @@ def write_blob(repo, text):
     return repo.create_blob(text).hex
 
 
+def create_commit(repo, author, committer, message, tree, parents):
+    return repo.create_commit(
+        None, author._sig, committer._sig, message, tree, parents).hex
+
+
 def cached(func):
     cache = dict()
     def wrapper(self, *args):
@@ -142,9 +201,30 @@ class TreeFilter(object):
         self.objmap = os.path.join(self.gitdir, 'objmap')
         self.repo = Repository(self.gitdir)
 
-    @cached
-    async def rewrite_root(self, sha1):
+    def rewrite_root(self, sha1):
         sha1 = sha1.strip()
+        obj = self.repo[sha1]
+        if obj.type == pygit2.GIT_OBJ_TREE:
+            return self.rewrite_root_tree(sha1)
+        # TODO: what about tags?
+        return self.rewrite_root_commit(sha1)
+
+    @cached
+    async def rewrite_root_commit(self, sha1):
+        commit = self.repo[sha1]
+        ids = [commit.tree_id] + commit.parent_ids
+        futures = [
+            asyncio.ensure_future(self.rewrite_root(id.hex))
+            for id in ids
+        ]
+        await asyncio.wait(futures)
+        tree, *parents = [f.result() for f in futures]
+        return await self.create_commit(
+            Signature(commit.author), Signature(commit.committer),
+            commit.message, tree, parents)
+
+    @cached
+    async def rewrite_root_tree(self, sha1):
         root = DirEntry(0o040000, 'tree', sha1, '')
         tree, = await self.rewrite_object(root)
         with open(os.path.join(self.objmap, sha1), 'w') as f:
@@ -193,21 +273,28 @@ class TreeFilter(object):
         if '--' in args:
             cut = args.index('--')
             args, refs = args[:cut], args[cut+1:]
-            instance = cls(*args)
-
             trees = communicate(['git', 'log', '--format=%T'] + refs)
             trees = sorted(set(trees.splitlines()))
-            return (instance.filter_tree(trees) or
-                    instance.filter_branch(refs))
-
         else:
-            instance = cls(*args)
-            return instance.filter_tree()
-
-    def filter_tree(self, trees=None):
-        if trees is None:
             trees = list(sys.stdin)
+            refs = []
 
+        size = 2*multiprocessing.cpu_count()
+        pool = ProcessPoolExecutor(size)
+        loop = asyncio.get_event_loop()
+        loop.set_default_executor(pool)
+
+        instance = cls(*args)
+        instance.size = size
+        future = asyncio.ensure_future(instance.filter(trees, refs))
+        loop.run_until_complete(future)
+        return future.result()
+
+    async def filter(self, trees, refs):
+        return (await self.filter_tree(trees) or
+                await self.filter_branch(refs))
+
+    async def filter_tree(self, trees):
         try:
             os.makedirs(self.objmap)
         except FileExistsError:
@@ -217,44 +304,35 @@ class TreeFilter(object):
             return 1
 
         SECTION("Rewriting trees")
+        await process_objects(self.size, self.rewrite_root, trees)
 
-        size = 2*multiprocessing.cpu_count()
-        self.pool = ProcessPoolExecutor(size)
-
-        loop = asyncio.get_event_loop()
-        loop.set_default_executor(self.pool)
-
-        pending = len(trees)
-        done = 0
-        start = time.time()
-
-        async def rewrite_roottree(tree):
-            await self.rewrite_root(tree)
-            nonlocal done
-            done += 1
-            passed = time.time() - start
-            rate = passed / done
-            eta = (pending - done) * rate
-            print('\r\033[K{} / {} Trees rewritten ({:.1f} trees/sec) in {}, ETA: {}'
-                  .format(done, pending, 1 / rate,
-                          time_to_str(passed), time_to_str(eta)),
-                  end='')
-            sys.stdout.flush()
-
-        loop.run_until_complete(AsyncQueue(size, (
-            rewrite_roottree(tree)
-            for tree in trees
-        )))
-
-        return 0
-
-    def filter_branch(self, refs):
+    async def filter_branch(self, refs):
+        # NOTE: Since commit rewriting is fully sequential by nature, we could
+        # just as well do this in a normal python function. It's done in a
+        # coroutine here just for consistency (easier migration).
+        # NOTE: We could gain some additional speedup by merging the two
+        # phases (commit/tree rewrites) into one thereby effectively making
+        # use of parallelization for the commit rewrites as well. However, I'd
+        # like to keep it separate at least for one commit to demonstrate the
+        # speedup due to using pygit rather than git-filter-branch. Also, this
+        # is a bit more modular.
         SECTION("Rewriting commits")
-        call([
-            'git', 'filter-branch', '--commit-filter',
-            'obj=$1 && shift && git commit-tree $(cat $objmap/$obj) "$@"',
-            '--'] + refs,
-             env={'objmap': self.objmap})
+        revs = communicate(['git', 'rev-list', '--reverse', *refs])
+        revs = revs.splitlines()
+        await process_objects(self.size, self.rewrite_root, revs)
+
+        SECTION("Updating refs")
+        for short in refs:
+            refs = communicate(['git', 'rev-parse', '--symbolic-full-name', short])
+            for ref in refs.splitlines():
+                old = self.repo.revparse_single(ref)
+                new = await self.rewrite_root(old.hex)
+                if old == new:
+                    print("WARNING: Ref {!r} is unchanged".format(ref))
+                else:
+                    self.repo.references[ref].set_target(new, "tree-filter")
+                    print("Ref {!r} was rewritten".format(ref))
+        return 0
 
     def read_tree(self, sha1):
         """Iterate over tuples (mode, kind, sha1, name)."""
@@ -269,6 +347,9 @@ class TreeFilter(object):
 
     def write_blob(self, text):
         return self.run_in_executor(write_blob, self.repo, text)
+
+    def create_commit(self, *args):
+        return self.run_in_executor(create_commit, self.repo, *args)
 
     def run_in_executor(self, fn, *args):
         loop = asyncio.get_event_loop()
