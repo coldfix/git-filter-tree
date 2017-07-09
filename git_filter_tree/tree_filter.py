@@ -93,6 +93,29 @@ class AsyncQueue:
         yield from self.done.wait()
 
 
+async def process_objects(size, func, objs):
+
+    start = time.time()
+    pending = len(objs)
+    done = 0
+
+    async def process(obj):
+        await func(obj)
+        nonlocal done
+        done += 1
+        passed = time.time() - start
+        rate = passed / done
+        eta = (pending - done) * rate
+        print('\r\033[K{} / {} objects rewritten ({:.1f} objs/sec) in {}, ETA: {}'
+                .format(done, pending, 1 / rate,
+                        time_to_str(passed), time_to_str(eta)),
+                end='')
+        sys.stdout.flush()
+
+    await AsyncQueue(size, map(process, objs))
+>>>>>>> 36e73db... Refactor common code for status report
+
+
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
 
     path = ''
@@ -272,28 +295,7 @@ class TreeFilter(object):
             return 1
 
         SECTION("Rewriting trees")
-
-        pending = len(trees)
-        done = 0
-        start = time.time()
-
-        async def rewrite_roottree(tree):
-            await self.rewrite_root(tree)
-            nonlocal done
-            done += 1
-            passed = time.time() - start
-            rate = passed / done
-            eta = (pending - done) * rate
-            print('\r\033[K{} / {} Trees rewritten ({:.1f} trees/sec) in {}, ETA: {}'
-                  .format(done, pending, 1 / rate,
-                          time_to_str(passed), time_to_str(eta)),
-                  end='')
-            sys.stdout.flush()
-
-        await AsyncQueue(self.size, (
-            rewrite_roottree(tree)
-            for tree in trees
-        ))
+        await process_objects(self.size, self.rewrite_root, trees)
 
     async def filter_branch(self, refs):
         # NOTE: Since commit rewriting is fully sequential by nature, we could
@@ -308,28 +310,7 @@ class TreeFilter(object):
         SECTION("Rewriting commits")
         revs = communicate(['git', 'rev-list', '--reverse', *refs])
         revs = revs.splitlines()
-
-        pending = len(revs)
-        done = 0
-        start = time.time()
-
-        async def rewrite_rootcommit(commit):
-            await self.rewrite_root(commit)
-            nonlocal done
-            done += 1
-            passed = time.time() - start
-            rate = passed / done
-            eta = (pending - done) * rate
-            print('\r\033[K{} / {} Commits rewritten ({:.1f} commits/sec) in {}, ETA: {}'
-                  .format(done, pending, 1 / rate,
-                          time_to_str(passed), time_to_str(eta)),
-                  end='')
-            sys.stdout.flush()
-
-        await AsyncQueue(self.size, (
-            rewrite_rootcommit(commit)
-            for commit in revs
-        ))
+        await process_objects(self.size, self.rewrite_root, revs)
 
         SECTION("Updating refs")
         for short in refs:
