@@ -1,6 +1,19 @@
 CHANGES
 ~~~~~~~
 
+2.0.0
+=====
+Date: 09.07.2017
+
+- speedup for first phase: factor on the order 3
+- major structural changes:
+    - use asyncio based scheduler to avoid double job-execution
+    - use pygit2 for tree-rewrite phase
+- requirements:
+    - depends on python≥3.6!
+    - needs pygit2 installed
+
+
 1.0.1
 =====
 Date: 09.07.2017
