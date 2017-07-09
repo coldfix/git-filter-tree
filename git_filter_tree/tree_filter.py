@@ -12,8 +12,8 @@ import asyncio
 from concurrent.futures import ProcessPoolExecutor
 
 from collections import namedtuple
-from subprocess import Popen, PIPE, call
-from itertools import starmap
+from subprocess import Popen, PIPE
+from itertools import chain
 
 import pygit2
 
@@ -65,12 +65,23 @@ class Signature:
 
 class AsyncQueue:
 
-    def __init__(self, size, jobs):
+    def __init__(self, size, cb=None):
+        self.jobs = ()
+        self.size = size
         self.done = asyncio.Event()
-        self.jobs = iter(jobs)
-        self.active = 0
-        for _ in range(size):
+        self.num_pending = 0
+        self.num_active = 0
+        self.num_total = 0
+        self.num_done = 0
+        self.status_callback = cb or (lambda q: None)
+
+    def enqueue(self, num, jobs):
+        self.num_pending += num
+        self.num_total += num
+        self.jobs = chain.from_iterable((self.jobs, jobs))
+        for _ in range(self.size - self.num_active):
             self._start()
+        return self
 
     def _start(self):
         try:
@@ -79,13 +90,16 @@ class AsyncQueue:
             return
         future = asyncio.ensure_future(job)
         future.add_done_callback(self._finished)
-        self.active += 1
+        self.num_active += 1
+        self.num_pending -= 1
 
     def _finished(self, future):
-        self.active -= 1
+        self.num_active -= 1
+        self.num_done += 1
         self._start()
-        if not self.active:
+        if not self.num_active:
             self.done.set()
+        self.status_callback(self)
 
     def __await__(self):
         # NOTE: can't use `async def __await` nor return `self.done.wait()`
@@ -96,13 +110,8 @@ class AsyncQueue:
 async def process_objects(size, func, objs):
 
     start = time.time()
-    pending = len(objs)
-    done = 0
-
-    async def process(obj):
-        await func(obj)
-        nonlocal done
-        done += 1
+    def status(queue):
+        done, pending = queue.num_done, queue.num_total
         passed = time.time() - start
         rate = passed / done
         eta = (pending - done) * rate
@@ -112,8 +121,8 @@ async def process_objects(size, func, objs):
                 end='')
         sys.stdout.flush()
 
-    await AsyncQueue(size, map(process, objs))
->>>>>>> 36e73db... Refactor common code for status report
+    queue = AsyncQueue(size, status)
+    await queue.enqueue(len(objs), map(func, objs))
 
 
 class DirEntry(namedtuple('DirEntry', ['mode', 'kind', 'sha1', 'name'])):
