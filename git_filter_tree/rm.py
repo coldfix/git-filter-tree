@@ -9,7 +9,7 @@ Arguments:
     PATH        Absolute filename within the repository
 """
 
-from .tree_filter import TreeFilter, cached, read_blob, write_blob
+from .tree_filter import TreeFilter, cached
 
 
 class Rm(TreeFilter):
@@ -20,7 +20,7 @@ class Rm(TreeFilter):
 
     # rewrite depends only on the object payload and name:
     def depends(self, obj):
-        return (obj.sha1, obj.name)
+        return (obj.sha1, obj.name, obj.mode)
 
     @cached
     def rewrite_file(self, obj):
@@ -28,8 +28,8 @@ class Rm(TreeFilter):
         if obj.path in self.files:
             return []
         if name == '.gitattributes':
-            text = obj.sha1 and read_blob(obj.sha1) or ""
-            sha1 = write_blob("\n".join(
+            text = obj.sha1 and self.read_blob(obj.sha1) or ""
+            sha1 = self.write_blob("\n".join(
                 line for line in text.splitlines()
                 for name, attr in [line.split(' ', 1)]
                 if name not in self.files))

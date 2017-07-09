@@ -5,6 +5,7 @@ Utility module for git tree-rewrites.
 import multiprocessing
 import os
 import sys
+import math
 import time
 
 from collections import namedtuple
@@ -77,7 +78,7 @@ def cached(func):
 
 
 def time_to_str(seconds):
-    return time.strftime('%H:%M:%S', time.gmtime(seconds))
+    return time.strftime('%H:%M:%S', time.gmtime(math.ceil(seconds)))
 
 
 def SECTION(title):
@@ -103,10 +104,10 @@ class TreeFilter(object):
     @cached
     def rewrite_tree(self, obj):
         """Rewrite all folder items individually, recursive."""
-        old_entries = list(read_tree(obj.sha1))
+        old_entries = list(self.read_tree(obj.sha1))
         new_entries = list(self.map_tree(obj, old_entries))
         if new_entries != old_entries:
-            sha1 = write_tree(new_entries)
+            sha1 = self.write_tree(new_entries)
         else:
             sha1 = obj.sha1
         return [(obj.mode, obj.kind, sha1, obj.name)]
@@ -128,7 +129,7 @@ class TreeFilter(object):
 
     def depends(self, obj):
         # In general, we have to depend on all metadata + location
-        return (obj[:], obj.path)
+        return (obj[:], obj.path, obj.mode)
 
     def _hash(self, obj=None):
         return hash(self.depends(obj) if isinstance(obj, DirEntry) else obj)
@@ -170,31 +171,22 @@ class TreeFilter(object):
 
         pending = len(trees)
         done = 0
-        tstart = time.time()
-        checkpoint_done = 0
-        checkpoint_time = tstart
+        start = time.time()
 
         for _ in pool.imap_unordered(self.rewrite_root, trees):
         #for _ in map(self.rewrite_root, trees):
             done += 1
-            now = time.time()
-            done_since_checkpoint = done - checkpoint_done
-            compl_rate = (now - checkpoint_time) / done_since_checkpoint
-            eta = time_to_str((pending - done) * compl_rate)
-            print('\r{} / {} Trees rewritten ({:.1f} trees/sec), ETA: {}          '
-                  .format(done, pending, 1 / compl_rate, eta), end='')
+            passed = time.time() - start
+            rate = passed / done
+            eta = (pending - done) * rate
+            print('\r\033[K{} / {} Trees rewritten ({:.1f} trees/sec) in {}, ETA: {}'
+                  .format(done, pending, 1 / rate,
+                          time_to_str(passed), time_to_str(eta)),
+                  end='')
             sys.stdout.flush()
-            # Keep a window of the last 5s of rewrites for ETA calculation.
-            if now - checkpoint_time > 5:
-                checkpoint_done = done
-                checkpoint_time = now
 
         pool.close()
         pool.join()
-
-        elapsed = time.time() - tstart
-        print('\nTree rewrite completed in {} ({:.1f} trees/sec)'
-              .format(time_to_str(elapsed), done / elapsed))
 
         return 0
 
@@ -205,3 +197,17 @@ class TreeFilter(object):
             'obj=$1 && shift && git commit-tree $(cat $objmap/$obj) "$@"',
             '--'] + refs,
              env={'objmap': self.objmap})
+
+    def read_tree(self, sha1):
+        """Iterate over tuples (mode, kind, sha1, name)."""
+        return read_tree(sha1)
+
+    def write_tree(self, entries):
+        """Create a tree and return the hash."""
+        return write_tree(entries)
+
+    def read_blob(self, sha1):
+        return read_blob(sha1)
+
+    def write_blob(self, text):
+        return write_blob(text)
