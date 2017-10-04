@@ -18,17 +18,17 @@ from .tree_filter import TreeFilter, cached
 import os
 
 
-def extract(sha1):
-    cmd = "git cat-file blob {} | gunzip | git hash-object -w -t blob --stdin"
-    return os.popen(cmd.format(sha1)).read().strip()
+def extract(sha1, program):
+    cmd = "git cat-file blob {} | {} | git hash-object -w -t blob --stdin"
+    return os.popen(cmd.format(sha1, program)).read().strip()
 
 
 class Unpack(TreeFilter):
 
-    def __init__(self, ext='.gz', unz='gunzip'):
+    def __init__(self, ext='.gz', program='gunzip'):
         super().__init__()
         self.ext = ext
-        self.unz = unz
+        self.program = program
 
     # rewrite depends only on the object payload and name:
     def depends(self, obj):
@@ -45,7 +45,7 @@ class Unpack(TreeFilter):
             ).encode('utf-8'))
         elif name.endswith(self.ext):
             name, ext = os.path.splitext(name)
-            sha1 = await self.run_in_executor(extract, sha1)
+            sha1 = await self.run_in_executor(extract, sha1, self.program)
         return [(mode, kind, sha1, name)]
 
 
