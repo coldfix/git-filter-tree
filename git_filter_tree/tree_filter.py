@@ -241,9 +241,11 @@ class TreeFilter(object):
         return [(obj.mode, obj.kind, sha1, obj.name)]
 
     async def map_tree(self, obj, entries):
-        # TODO: query multiple entries at once?
-        return [entry for m, k, s, n in entries
-                for entry in await self.rewrite_object(obj.child(m, k, s, n))]
+        results = await asyncio.gather(*[
+            self.rewrite_object(obj.child(*entry))
+            for entry in entries
+        ])
+        return [entry for entries in results for entry in entries]
 
     @cached
     def rewrite_object(self, obj):
