@@ -213,12 +213,10 @@ class TreeFilter(object):
     async def rewrite_root_commit(self, sha1):
         commit = self.repo[sha1]
         ids = [commit.tree_id] + commit.parent_ids
-        futures = [
+        tree, *parents = await asyncio.gather(*[
             asyncio.ensure_future(self.rewrite_root(id.hex))
             for id in ids
-        ]
-        await asyncio.wait(futures)
-        tree, *parents = [f.result() for f in futures]
+        ])
         return await self.create_commit(
             Signature(commit.author), Signature(commit.committer),
             commit.message, tree, parents)
