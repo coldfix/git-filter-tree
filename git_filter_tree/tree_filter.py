@@ -305,6 +305,8 @@ class TreeFilter(object):
         await process_objects(self.size, self.rewrite_root, objs)
 
     async def filter_branch(self, refs):
+        if not refs:
+            return 0
         # NOTE: Since commit rewriting is fully sequential by nature, we could
         # just as well do this in a normal python function. It's done in a
         # coroutine here just for consistency.
