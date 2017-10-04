@@ -225,8 +225,7 @@ class TreeFilter(object):
     async def rewrite_root_tree(self, sha1):
         root = DirEntry(0o040000, 'tree', sha1, '')
         tree, = await self.rewrite_object(root)
-        with open(os.path.join(self.objmap, sha1), 'w') as f:
-            f.write(tree[2])
+        self.objmap_file.write('{} {}\n'.format(sha1, tree[2]))
         return tree[2]
 
     @cached
@@ -291,18 +290,17 @@ class TreeFilter(object):
         return future.result()
 
     async def filter(self, objs, refs):
-        return (await self.filter_tree(objs) or
-                await self.filter_branch(refs))
-
-    async def filter_tree(self, objs):
-        try:
-            os.makedirs(self.objmap)
-        except FileExistsError:
+        if os.path.exists(self.objmap):
             print("objmap already exists:", self.objmap)
             print("If there is no other rebase in progress, please clean up\n"
                   "this folder and retry.")
             return 1
+        with open(self.objmap, 'wt') as f:
+            self.objmap_file = f
+            return (await self.filter_tree(objs) or
+                    await self.filter_branch(refs))
 
+    async def filter_tree(self, objs):
         SECTION("Rewriting trees")
         await process_objects(self.size, self.rewrite_root, objs)
 
