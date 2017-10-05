@@ -7,7 +7,7 @@ Usage:
 Arguments:
 
     TREEMAP     Path to tree index. For every top-level tree there should be
-                a file $TREEMAP/$TREE_SHA1 that contains the SHA1 of the
+                a line "$TREE_SHA1 $COMMIT_SHA1" that contains the SHA1 of the
                 target commit.
     FOLDER      Subfolder to replace.
     URL         URL of the submodule
@@ -26,10 +26,11 @@ class Dir2Mod(TreeFilter):
 
     def __init__(self, treemap, folder, url, name=None):
         super().__init__()
-        self.treemap = treemap
         self.path = folder
         self.url = url
         self.name = name or folder
+        with open(treemap) as f:
+            self.commit_for_tree = dict(line.strip().split() for line in f)
 
     def depends(self, obj):
         return (obj.sha1, obj.path, obj.mode)
@@ -48,7 +49,7 @@ class Dir2Mod(TreeFilter):
     @cached
     async def rewrite_tree(self, obj):
         if obj.path == self.path:
-            commit = open(os.path.join(self.treemap, obj.sha1)).read().strip()
+            commit = self.commit_for_tree[obj.sha1]
             return [(0o160000, 'commit', commit, obj.name, True)]
         # only recurse into `self.path`:
         elif not obj.path or self.path.startswith(obj.path + '/'):

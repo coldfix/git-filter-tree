@@ -41,10 +41,7 @@ extract_submodule() {
     done
 
     SECTION "$submodule: Creating index: TREE -> COMMIT"
-    mkdir treemap
-    git log --format="%H %T" --branches --tags | while read sha1 tree; do
-        echo $sha1 > treemap/$tree
-    done
+    git log --format="%T %H" --branches --tags > treemap
 
     cd -
 }
@@ -79,6 +76,12 @@ rewrite_dir2mod_slow() {
 
     cd $repository
 
+    # extract treemap file into structure that's easier to access from shell:
+    mkdir $submodule/treemap.dir
+    while read tree sha1; do
+        echo $sha1 > $submodule/treemap.dir/$tree
+    done <$submodule/treemap
+
     >gitmod <<EOF
 [submodule "$subfolder"]
     path = $subfolder
@@ -96,7 +99,7 @@ EOF
                 (git cat-file blob $obj_gitmod_old && cat $GIT_DIR/gitmod) |
                 git hash-object -w -t blob --stdin |
                 tee .gitmod/$obj_gitmod_old )
-            obj_submod=$(cat "$submodule"/treemap/$obj_folder)
+            obj_submod=$(cat "$submodule"/treemap.dir/$obj_folder)
             git rm -r --cached -q "$subfolder"
             git update-index --add --cacheinfo 100644 $obj_gitmod .gitmodules
             git update-index --add --cacheinfo 160000 $obj_submod "$subfolder"
