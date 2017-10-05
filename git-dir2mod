@@ -43,6 +43,16 @@ extract_submodule() {
     SECTION "$submodule: Creating index: TREE -> COMMIT"
     git log --format="%T %H" --branches --tags > treemap
 
+    # consistency check:
+    num_new_commits=$(wc -l <treemap)
+    num_unique_trees=$(sort -u treemap -k 1,1 | wc -l)
+    if [[ $num_new_commits != $num_unique_trees ]]; then
+        echo "Error: several commits corresponding to the same subdir tree!"
+        echo "This script can currently not deal with reverts within the subdirectory."
+        echo "You would end up with an incorrect history."
+        exit 1
+    fi
+
     cd -
 }
 

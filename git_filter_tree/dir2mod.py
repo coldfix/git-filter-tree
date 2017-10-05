@@ -24,13 +24,20 @@ import os
 
 class Dir2Mod(TreeFilter):
 
+    # TODO: treemap -> commitmap
     def __init__(self, treemap, folder, url, name=None):
         super().__init__()
         self.path = folder
         self.url = url
         self.name = name or folder
         with open(treemap) as f:
-            self.commit_for_tree = dict(line.strip().split() for line in f)
+            items = [line.strip().split() for line in f]
+        self.commit_for_tree = dict(items)
+        if len(self.commit_for_tree) != len(items):
+            raise ValueError(
+                "Error: several commits corresponding to the same subdir tree!\n"
+                "This script can currently not deal with reverts within the subdirectory.\n"
+                "You would end up with an incorrect history.")
 
     def depends(self, obj):
         return (obj.sha1, obj.path, obj.mode)
