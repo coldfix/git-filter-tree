@@ -1,5 +1,6 @@
 """
-History rewrite helper script: Convert files to unix line endings in history
+History rewrite helper script: Convert files to unix line endings, and remove
+                               trailing spaces from them, in history
 
 Usage:
     git-filter-tree dos2unix EXT [-- REFS]

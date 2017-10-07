@@ -71,6 +71,17 @@ a submodule.
 
 For more details, see `git dir2mod: subdir to submodule`_.
 
+dos2unix
+~~~~~~~~
+
+Convert the files with the specified extension to unix line endings, and
+remove trailing whitespace from each line, as well as trailing blank lines,
+while ensuring that the file ends with a newline. Usage:
+
+.. code-block:: bash
+
+    python3 git_tree_filter dos2unix [EXT] -- --branches --tags
+
 
 .. References:
 
