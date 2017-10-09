@@ -14,6 +14,9 @@ Arguments:
 from .tree_filter import TreeFilter, cached
 
 import os
+import re
+
+TRAILING_WS = re.compile(br'[^\S\n]\n')
 
 class Dos2Unix(TreeFilter):
 
@@ -34,7 +37,7 @@ class Dos2Unix(TreeFilter):
 
     async def convertToUnix(self, obj):
         text = await self.read_blob(obj.sha1)
-        if len(text) == 0 or text[-1] == b'\n' and (len(text) == 1 or text[-2] != b'\n') and text.find(b"\r") == -1 and text.find(b" \n") == -1:
+        if not text or text.endswith(b'\n') and not text.endswith(b'\n\n') and not TRAILING_WS.search(text):
             return obj.sha1
         lines = text.splitlines()
         while len(lines) > 0 and lines[-1].rstrip() == b"":
