@@ -34,7 +34,7 @@ class Dos2Unix(TreeFilter):
 
     async def convertToUnix(self, obj):
         text = await self.read_blob(obj.sha1)
-        if text.find(b"\r") == -1 and text.find(b" \n") == -1:
+        if len(text) == 0 or text[-1] == b'\n' and (len(text) == 1 or text[-2] != b'\n') and text.find(b"\r") == -1 and text.find(b" \n") == -1:
             return obj.sha1
         lines = text.splitlines()
         while len(lines) > 0 and lines[-1].rstrip() == b"":
