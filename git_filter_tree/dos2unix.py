@@ -34,14 +34,16 @@ class Dos2Unix(TreeFilter):
 
     async def convertToUnix(self, obj):
         text = await self.read_blob(obj.sha1)
-        lines = text.decode('utf-8').splitlines()
-        while len(lines) > 0 and lines[-1] == '':
+        if text.find(b"\r") == -1 and text.find(b" \n") == -1:
+            return obj.sha1
+        lines = text.splitlines()
+        while len(lines) > 0 and lines[-1].rstrip() == b"":
             lines.pop()
         if len(lines) > 0:
-            content =  "\n".join(line.rstrip() for line in lines) + "\n"
+            content =  b"\n".join(map(bytes.rstrip, lines)) + b"\n"
         else:
-            content = ""
-        return await self.write_blob(content.encode('utf-8'))
+            content = b""
+        return await self.write_blob(content)
 
 main = Dos2Unix.main
 if __name__ == '__main__':
