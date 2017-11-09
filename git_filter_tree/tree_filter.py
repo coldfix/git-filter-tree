@@ -325,7 +325,7 @@ class TreeFilter(object):
             for ref in refs.splitlines():
                 old = self.repo.revparse_single(ref)
                 new = await self.rewrite_root(old.hex)
-                if old == new:
+                if old.hex == new:
                     print("WARNING: Ref {!r} is unchanged".format(ref))
                 else:
                     self.repo.references[ref].set_target(new, "tree-filter")
