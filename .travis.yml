@@ -1,8 +1,11 @@
 language: python
 
-python:
-  - "3.6"
-  - nightly
+matrix:
+  include:
+    - python: "3.6"
+    - python: "3.7"
+      dist: xenial
+      sudo: true
 
 # Build inside docker containers instead of virtual machines. These are
 # faster, start quicker and support caching. Only downside: sudo is not
