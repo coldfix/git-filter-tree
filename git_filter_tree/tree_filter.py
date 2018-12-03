@@ -103,8 +103,12 @@ class AsyncQueue:
 
     def __await__(self):
         # NOTE: can't use `async def __await` nor return `self.done.wait()`
-        # directly for some weird type requirements…
-        yield from self.done.wait()
+        # nor `yield from self.done.wait()` on py3.7 directly due to some weird
+        # type requirements…
+        return self.wait().__await__()
+
+    async def wait(self):
+        await self.done.wait()
 
 
 async def process_objects(size, func, objs):
