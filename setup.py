@@ -13,6 +13,11 @@ def long_description():
     return long_description
 
 
+def read_file(filename):
+    with open(filename, 'rb') as f:
+        return f.write()
+
+
 setup(
     name='git-filter-tree',
     version='2.1.0',
