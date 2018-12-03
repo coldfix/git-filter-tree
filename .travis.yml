@@ -5,24 +5,11 @@ matrix:
     - python: "3.6"
     - python: "3.7"
       dist: xenial
-      sudo: true
-
-# Build inside docker containers instead of virtual machines. These are
-# faster, start quicker and support caching. Only downside: sudo is not
-# supported.
-sudo: false
-
-# Build on Ubuntu 14.04 LTS Server Edition 64 bit (Trusty Tahr) to pull
-# in a more recent version of the git CLI than on Precise Pangolin
-# (needed for the scripts):
-dist: trusty
 
 # Need to install libgit2 manually to make sure we get a recent version
 # of the development files – needed to build pygit2:
 env: LIBGIT2=~/libgit2/_install/ LD_LIBRARY_PATH=~/libgit2/_install/lib
 
-# Dependencies can be installed as follows. This works only for packages
-# whitelisted on https://github.com/travis-ci/apt-package-whitelist:
 addons:
   apt:
     packages:
